@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.28729.10
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MapDataServer", "MapDataServer\MapDataServer.csproj", "{23A390D7-72E5-4063-85F5-9DCC0FC367A9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MapDataServer", "MapDataServer\MapDataServer.csproj", "{0F25A7BE-2B24-463F-A0F0-834D66E4568C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,15 +11,15 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{23A390D7-72E5-4063-85F5-9DCC0FC367A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{23A390D7-72E5-4063-85F5-9DCC0FC367A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{23A390D7-72E5-4063-85F5-9DCC0FC367A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{23A390D7-72E5-4063-85F5-9DCC0FC367A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F25A7BE-2B24-463F-A0F0-834D66E4568C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F25A7BE-2B24-463F-A0F0-834D66E4568C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F25A7BE-2B24-463F-A0F0-834D66E4568C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F25A7BE-2B24-463F-A0F0-834D66E4568C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {493013C2-9DAA-44AE-A1A4-70644A4AC303}
+		SolutionGuid = {85C2F347-A2B8-4876-89A1-3F0AE68D4693}
 	EndGlobalSection
 EndGlobal
