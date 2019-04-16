@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MapDataServer.Models;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace MapDataServer.Controllers
 {
@@ -10,6 +12,22 @@ namespace MapDataServer.Controllers
     [ApiController]
     public class ValuesController : ControllerBase
     {
+        public ValuesController(Models.TestContext context)
+        {
+            //context.Add(new TestModel1());
+            //context.SaveChanges();
+            AmazonSetup();
+        }
+
+        public async void AmazonSetup()
+        {
+            Amazon.Athena.AmazonAthenaClient client = new Amazon.Athena.AmazonAthenaClient(
+                new Amazon.Runtime.BasicAWSCredentials("comeonwhatisit", "dontyouwanttoknow"),
+                Amazon.RegionEndpoint.USEast2);
+            var queries = await client.ListNamedQueriesAsync(new Amazon.Athena.Model.ListNamedQueriesRequest() { });
+            var query = await client.GetNamedQueryAsync(new Amazon.Athena.Model.GetNamedQueryRequest() { NamedQueryId = "746fa110-45e7-47f9-9a12-3c8d0bb582ab" });
+        }
+
         // GET api/values
         [HttpGet]
         public ActionResult<IEnumerable<string>> Get()
