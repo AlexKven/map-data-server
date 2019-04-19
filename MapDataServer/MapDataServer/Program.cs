@@ -19,6 +19,10 @@ namespace MapDataServer
 
         public static IWebHostBuilder CreateWebHostBuilder(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration(builder =>
+            {
+                builder.AddJsonFile("secrets.json", false);
+            })
                 .UseStartup<Startup>();
     }
 }
