@@ -10,6 +10,8 @@ namespace MapDataServer.Controllers
     [ApiController]
     public class ValuesController : ControllerBase
     {
+        public ValuesController(DiTest test) { }
+
         // GET api/values
         [HttpGet]
         public ActionResult<IEnumerable<string>> Get()
