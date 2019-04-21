@@ -5,12 +5,16 @@ using System.Threading.Tasks;
 
 namespace MapDataServer.Converters
 {
-    public interface IDbType<T>
+    public interface IDbType<T> : IDbType
     {
         T FromString(string value);
         string ToString(T value);
-        string DbTypeName { get; }
-        bool NotNull { get; }
         T NullValue { get; }
+    }
+
+    public interface IDbType
+    {
+        bool NotNull { get; }
+        string DbTypeName { get; }
     }
 }

@@ -9,8 +9,14 @@ namespace MapDataServer.Utilities
     {
         string Name { get; }
         bool? NotNull { get; }
-        bool Default { get; }
+        object Default { get; }
         bool AutoIncrement { get; }
         bool PrimaryKey { get; }
+
+        IDbRowParameter MakeNotNull();
+        IDbRowParameter BlockNotNull();
+        IDbRowParameter MakeAutoIncrement();
+        IDbRowParameter MakePrimaryKey();
+        IDbRowParameter SetDefault(object _default);
     }
 }

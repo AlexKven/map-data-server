@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using MySql.Data.MySqlClient;
 using System.Data;
+using System.Data.Common;
 
 namespace MapDataServer.Services
 {
@@ -19,7 +20,7 @@ namespace MapDataServer.Services
             ConnectionString = connectionString;
         }
 
-        public IDbConnection GetConnection()
+        public DbConnection GetConnection()
         {
             return new MySqlConnection(ConnectionString);
         }

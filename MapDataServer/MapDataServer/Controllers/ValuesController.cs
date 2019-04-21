@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MapDataServer.Services;
+using MapDataServer.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MapDataServer.Controllers
@@ -10,12 +12,22 @@ namespace MapDataServer.Controllers
     [ApiController]
     public class ValuesController : ControllerBase
     {
-        public ValuesController(DiTest test) { }
+        private IDbClient DbClient { get; }
+        public ValuesController(IDbClient dbClient)
+        {
+            DbClient = dbClient;
+        }
 
         // GET api/values
         [HttpGet]
-        public ActionResult<IEnumerable<string>> Get()
+        public async Task<ActionResult<IEnumerable<string>>> Get()
         {
+            await DbClient.Open();
+            var sucess = await DbClient.CreateTable<Tuple<int, string, string, long>>("test_table",
+                new DbRowParameter("id").MakeAutoIncrement().MakePrimaryKey(),
+                new DbRowParameter("name").MakeNotNull(),
+                new DbRowParameter("description"),
+                new DbRowParameter("subId").BlockNotNull().MakePrimaryKey());
             return new string[] { "value1", "value2" };
         }
 

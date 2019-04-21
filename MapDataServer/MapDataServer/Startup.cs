@@ -45,6 +45,8 @@ namespace MapDataServer
             services.AddSingleton<IDbConnectionFactory, DbConnectionFactory>(provider =>
                 new DbConnectionFactory(provider.GetService<IConfiguration>().GetConnectionString("MySQL")))
             .AddSingleton<IDbType<int>>(new DbType<int>("INT", val => int.Parse(val), val => val.ToString(), 0, true))
+            .AddSingleton<IDbType<long>>(new DbType<long>("BIGINT", val => long.Parse(val), val => val.ToString(), 0, true))
+            .AddSingleton<IDbType<string>>(new DbType<string>("TEXT", val => val, val => val, null, false))
             .AddSingleton<IDbType<bool>>(new DbType<bool>("BOOLEAN", val => bool.Parse(val), val => val ? "TRUE" : "FALSE", false, true))
             .AddSingleton<IDbType<double>>(new DbType<double>("DOUBLE", val => double.Parse(val), val =>
             {
@@ -54,7 +56,8 @@ namespace MapDataServer
             }, double.NaN, true))
             .AddSingleton<IDbType<float>>(new DbType<float>("FLOAT", val => float.Parse(val), val => val.ToString(), float.NaN, true))
             .AddSingleton<IDbType<int?>, DependencyInjectedNullableDbType<int>>()
-            .AddSingleton<DiTest>();
+            .AddSingleton<DiTest>()
+            .AddSingleton<IDbClient, DbClient>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
