@@ -2,6 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using LinqToDB;
+using MapDataServer.Models;
+using MapDataServer.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MapDataServer.Controllers
@@ -10,10 +13,19 @@ namespace MapDataServer.Controllers
     [ApiController]
     public class ValuesController : ControllerBase
     {
+        private IDatabase Database { get; }
+        public ValuesController(IDatabase database)
+        {
+            Database = database;
+        }
+
         // GET api/values
         [HttpGet]
         public ActionResult<IEnumerable<string>> Get()
         {
+            Database.CreateTable<MapRegion>();
+            Database.Insert(new MapRegion() { Lat = 5, Lon = 4 });
+            var back = Database.MapRegions.ToList();
             return new string[] { "value1", "value2" };
         }
 
