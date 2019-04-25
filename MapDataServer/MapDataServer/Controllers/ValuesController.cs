@@ -21,11 +21,9 @@ namespace MapDataServer.Controllers
 
         // GET api/values
         [HttpGet]
-        public ActionResult<IEnumerable<string>> Get()
+        public async Task<ActionResult<IEnumerable<string>>> Get()
         {
-            Database.CreateTable<MapRegion>();
-            Database.Insert(new MapRegion() { Lat = 5, Lon = 4 });
-            var back = Database.MapRegions.ToList();
+            await Database.Initializer;
             return new string[] { "value1", "value2" };
         }
 
