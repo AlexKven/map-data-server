@@ -14,6 +14,7 @@
     <PackageReference Include="linq2db.MySql" Version="2.6.4" />
     <PackageReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.AspNetCore.Razor.Design" Version="2.1.2" PrivateAssets="All" />
+    <PackageReference Include="OsmSharp" Version="6.1.0" />
   </ItemGroup>
 
 </Project>

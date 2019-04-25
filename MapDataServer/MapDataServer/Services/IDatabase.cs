@@ -12,6 +12,8 @@ namespace MapDataServer.Services
     public interface IDatabase : IDataContext
     {
         ITable<MapRegion> MapRegions { get; }
+        ITable<MapNode> MapNodes { get; }
+        ITable<GeoTag> GeoTags { get; }
         Task Initializer { get; }
     }
 }

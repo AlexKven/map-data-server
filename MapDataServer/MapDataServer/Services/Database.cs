@@ -22,15 +22,9 @@ namespace MapDataServer.Services
 
         public ITable<MapRegion> MapRegions => GetTable<MapRegion>();
 
-        //public Task BeginTransactionAsync()
-        //{
-        //    throw new NotImplementedException();
-        //}
+        public ITable<MapNode> MapNodes => GetTable<MapNode>();
 
-        //public Task EndTransactionAsync()
-        //{
-        //    throw new NotImplementedException();
-        //}
+        public ITable<GeoTag> GeoTags => GetTable<GeoTag>();
 
         private async Task InitializeAsync()
         {
@@ -39,6 +33,14 @@ namespace MapDataServer.Services
             if (!tableTypes.Contains("MapRegions"))
             {
                 await this.CreateTableAsync<MapRegion>();
+            }
+            if (!tableTypes.Contains("MapNodes"))
+            {
+                await this.CreateTableAsync<MapNode>();
+            }
+            if (!tableTypes.Contains("GeoTags"))
+            {
+                await this.CreateTableAsync<GeoTag>();
             }
         }
     }

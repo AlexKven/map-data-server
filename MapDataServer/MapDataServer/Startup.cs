@@ -32,7 +32,8 @@ namespace MapDataServer
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
             services.AddSingleton<IDataProvider, LinqToDB.DataProvider.MySql.MySqlDataProvider>()
-            .AddSingleton<IDatabase, Database>();
+            .AddSingleton<IDatabase, Database>()
+            .AddHttpClient();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
