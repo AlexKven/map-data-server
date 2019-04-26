@@ -11,15 +11,49 @@ namespace MapDataServer.Models
     {
         public MapRegion() { }
 
-        public MapRegion(double lat, double lon)
+        public MapRegion(int lon, int lat)
         {
             Lat = lat;
             Lon = lon;
         }
 
-        [PrimaryKey, NotNull, DataType(LinqToDB.DataType.Double)]
-        public double Lat { get; set; }
-        [PrimaryKey, NotNull, DataType(LinqToDB.DataType.Double)]
-        public double Lon { get; set; }
+        public static long GetValue(int lon, int lat)
+        {
+            long result = lat;
+            result = result << 32;
+            result = result | (uint)lon;
+            return result;
+        }
+
+        public static (int, int) GetComponents(long value)
+        {
+            int lon = (int)(value & uint.MaxValue);
+            int lat = (int)(value >> 32);
+            return (lon, lat);
+        }
+
+        public static long GetRegionContaining(double lon, double lat)
+        {
+            int rLat = (int)Math.Floor(lat / .01);
+            int rLon = (int)Math.Floor(lon / .01);
+            return GetValue(rLon, rLat);
+        }
+
+        public static long GetStartOfQuadrantContaining(double lon, double lat)
+            => GetRegionContaining(lon - .005, lat - .005);
+
+        [PrimaryKey, NotNull, DataType(LinqToDB.DataType.Int64)]
+        public long Value { get; set; }
+
+        public int Lat
+        {
+            get => GetComponents(Value).Item1;
+            set => Value = GetValue(value, Lat);
+        }
+        public int Lon
+        {
+            get => GetComponents(Value).Item2;
+            set => Value = GetValue(Lon, value);
+        }
     }
 }

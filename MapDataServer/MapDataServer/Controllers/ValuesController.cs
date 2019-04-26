@@ -18,56 +18,59 @@ namespace MapDataServer.Controllers
     {
         private IDatabase Database { get; }
         private IHttpClientFactory HttpClientFactory { get; }
-        public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory)
+        private IMapDownloader MapDownloader { get; }
+        public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory, IMapDownloader mapDownloader)
         {
             Database = database;
             HttpClientFactory = httpClientFactory;
+            MapDownloader = mapDownloader;
         }
 
         // GET api/values
         [HttpGet]
         public async Task<ActionResult<IEnumerable<string>>> Get()
         {
-            await Database.Initializer;
-            var httpClient = HttpClientFactory.CreateClient();
+            await MapDownloader.DownloadMapRegions(-12237, 4730, 1, 1);
 
-            var request = new HttpRequestMessage(HttpMethod.Get, "https://api.openstreetmap.org/api/0.6/map?bbox=-122.366622,47.297579,-122.331534,47.306842");
-            OsmSharp.Relation
-            var result = await httpClient.SendAsync(request);
+            //await Database.Initializer;
+            //var httpClient = HttpClientFactory.CreateClient();
 
-            using (result)
-            {
-                using (var stream = await result.Content.ReadAsStreamAsync())
-                {
-                    var source = new XmlOsmStreamSource(stream);
-                    var nodes = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Node).Cast<OsmSharp.Node>();
-                    foreach (var node in nodes)
-                    {
-                        if (!(node.Id.HasValue && node.Latitude.HasValue && node.Longitude.HasValue))
-                            continue;
-                        var dbNode = new MapNode()
-                        {
-                            Id = node.Id.Value,
-                            GeneratedDate = node.TimeStamp,
-                            SavedDate = DateTime.UtcNow,
-                            IsVisible = node.Visible,
-                            Latitude = node.Latitude.Value,
-                            Longitude = node.Longitude.Value
-                        };
-                        await Database.InsertOrReplaceAsync(dbNode);
-                        foreach (var tag in node.Tags ?? Enumerable.Empty<Tag>())
-                        {
-                            var dbTag = new GeoTag()
-                            {
-                                GeoId = node.Id.Value,
-                                Key = tag.Key,
-                                Value = tag.Value
-                            };
-                            await Database.InsertOrReplaceAsync(dbTag);
-                        }
-                    }
-                }
-            }
+            //var request = new HttpRequestMessage(HttpMethod.Get, "https://api.openstreetmap.org/api/0.6/map?bbox=-122.366622,47.297579,-122.331534,47.306842");
+            //var result = await httpClient.SendAsync(request);
+
+            //using (result)
+            //{
+            //    using (var stream = await result.Content.ReadAsStreamAsync())
+            //    {
+            //        var source = new XmlOsmStreamSource(stream);
+            //        var nodes = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Node).Cast<OsmSharp.Node>();
+            //        foreach (var node in nodes)
+            //        {
+            //            if (!(node.Id.HasValue && node.Latitude.HasValue && node.Longitude.HasValue))
+            //                continue;
+            //            var dbNode = new MapNode()
+            //            {
+            //                Id = node.Id.Value,
+            //                GeneratedDate = node.TimeStamp,
+            //                SavedDate = DateTime.UtcNow,
+            //                IsVisible = node.Visible,
+            //                Latitude = node.Latitude.Value,
+            //                Longitude = node.Longitude.Value
+            //            };
+            //            await Database.InsertOrReplaceAsync(dbNode);
+            //            foreach (var tag in node.Tags ?? Enumerable.Empty<Tag>())
+            //            {
+            //                var dbTag = new GeoTag()
+            //                {
+            //                    GeoId = node.Id.Value,
+            //                    Key = tag.Key,
+            //                    Value = tag.Value
+            //                };
+            //                await Database.InsertOrReplaceAsync(dbTag);
+            //            }
+            //        }
+            //    }
+            //}
 
             return new string[] { "value1", "value2" };
         }

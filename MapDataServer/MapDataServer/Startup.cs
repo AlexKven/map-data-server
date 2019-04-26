@@ -33,6 +33,7 @@ namespace MapDataServer
 
             services.AddSingleton<IDataProvider, LinqToDB.DataProvider.MySql.MySqlDataProvider>()
             .AddSingleton<IDatabase, Database>()
+            .AddSingleton<IMapDownloader, MapDownloader>()
             .AddHttpClient();
         }
 
