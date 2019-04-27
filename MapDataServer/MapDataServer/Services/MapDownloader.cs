@@ -1,4 +1,5 @@
 ﻿using LinqToDB;
+using LinqToDB.SqlQuery;
 using MapDataServer.Helpers;
 using MapDataServer.Models;
 using OsmSharp.Streams;
@@ -15,6 +16,7 @@ namespace MapDataServer.Services
     {
         private IDatabase Database { get; }
         private IHttpClientFactory HttpClientFactory { get; }
+        private TimeSpan MaxAge { get; } = TimeSpan.FromDays(30);
         public MapDownloader(IDatabase database, IHttpClientFactory httpClientFactory)
         {
             Database = database;
@@ -39,9 +41,16 @@ namespace MapDataServer.Services
         public async Task DownloadMapRegions(int minLon, int minLat, int lengthLon, int lengthLat)
         {
             await Database.Initializer;
-            for (int i = 0; i < lengthLat; i+= 2)
+            for (int i = 0; i < lengthLon; i++)
             {
-                for (int j = 0; j < lengthLon; j += 2)
+                for (int j = 0; j < lengthLat; j++)
+                {
+                    await  Database.InsertOrReplaceAsync(new MapRegion(minLon + i, minLat + j));
+                }
+            }
+            for (int i = 0; i < lengthLon; i+= 2)
+            {
+                for (int j = 0; j < lengthLat; j += 2)
                 {
                     var height = Math.Min(2, lengthLat - j);
                     var width = Math.Min(2, lengthLon - i);
@@ -59,14 +68,31 @@ namespace MapDataServer.Services
                     {
                         using (var stream = await result.Content.ReadAsStreamAsync())
                         {
+                            var dateThreshold = DateTime.UtcNow - MaxAge;
+
                             var source = new XmlOsmStreamSource(stream);
-                            var nodes = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Node).Cast<OsmSharp.Node>().ToDictionary(n => n.Id);
-                            var ways = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Way).Cast<OsmSharp.Way>();
-                            var relations = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Relation).Cast<OsmSharp.Relation>();
+
+                            var dbNodes = await Database.MapNodes.Where(mn => mn.SavedDate > dateThreshold).Select(mn => mn.Id).ToListAsync();
+                            dbNodes.Sort();
+                            var nodes = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Node).Cast<OsmSharp.Node>()
+                                .Where(node => node.Id.HasValue && node.Latitude.HasValue && node.Longitude.HasValue)
+                                .Where(node => dbNodes.BinarySearch(node.Id.Value) == -1)
+                                .ToDictionary(node => node.Id);
+
+                            var dbWays = await Database.MapWays.Where(mw => mw.SavedDate > dateThreshold).Select(mw => mw.Id).ToListAsync();
+                            dbWays.Sort();
+                            var ways = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Way).Cast<OsmSharp.Way>()
+                                .Where(geo => geo.Id.HasValue)
+                                .Where(geo => dbNodes.BinarySearch(geo.Id.Value) == -1);
+
+                            var dbRelations = await Database.MapRelations.Where(mr => mr.SavedDate > dateThreshold).Select(mr => mr.Id).ToListAsync();
+                            dbRelations.Sort();
+                            var relations = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Relation).Cast<OsmSharp.Relation>()
+                                .Where(geo => geo.Id.HasValue)
+                                .Where(geo => dbRelations.BinarySearch(geo.Id.Value) == -1);
+
                             foreach (var node in nodes)
                             {
-                                if (!(node.Value.Id.HasValue && node.Value.Latitude.HasValue && node.Value.Longitude.HasValue))
-                                    continue;
                                 var dbNode = new MapNode()
                                 {
                                     Id = node.Value.Id.Value,
@@ -79,11 +105,9 @@ namespace MapDataServer.Services
                                 await SaveTagsForGeo(node.Value);
                                 await Database.InsertOrReplaceAsync(dbNode);
                             }
-                            
+
                             foreach (var way in ways)
                             {
-                                if (!way.Id.HasValue)
-                                    continue;
                                 var dbWay = new MapWay()
                                 {
                                     Id = way.Id.Value,
@@ -115,7 +139,15 @@ namespace MapDataServer.Services
                                         if (dbWay.MaxLon < node.Longitude)
                                             dbWay.MaxLon = node.Longitude;
                                     }
-                                    await Database.InsertOrReplaceAsync(new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value });
+                                    var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value };
+                                    try
+                                    {
+                                        await Database.InsertAsync(dbWNL);
+                                    }
+                                    catch (MySql.Data.MySqlClient.MySqlException)
+                                    {
+
+                                    }
                                 }
                                 await Database.InsertOrReplaceAsync(dbWay);
                             }

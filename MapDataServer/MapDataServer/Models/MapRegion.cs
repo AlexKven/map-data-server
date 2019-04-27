@@ -9,12 +9,13 @@ namespace MapDataServer.Models
     [Table(Name = "MapRegions")]
     public class MapRegion
     {
-        public MapRegion() { }
+        public MapRegion() => SavedDate = DateTime.UtcNow;
 
         public MapRegion(int lon, int lat)
         {
             Lat = lat;
             Lon = lon;
+            SavedDate = DateTime.UtcNow;
         }
 
         public static long GetValue(int lon, int lat)
@@ -55,5 +56,8 @@ namespace MapDataServer.Models
             get => GetComponents(Value).Item2;
             set => Value = GetValue(Lon, value);
         }
+
+        [Column(Name = nameof(SavedDate)), DataType(LinqToDB.DataType.DateTime), NotNull]
+        public DateTime SavedDate { get; set; }
     }
 }
