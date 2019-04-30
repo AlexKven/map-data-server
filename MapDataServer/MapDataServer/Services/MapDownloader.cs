@@ -7,6 +7,7 @@ using OsmSharp.Tags;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -14,6 +15,11 @@ namespace MapDataServer.Services
 {
     public class MapDownloader : IMapDownloader
     {
+        private class WayNodeLinkComparer : Comparer<WayNodeLink>
+        {
+            public override int Compare(WayNodeLink x, WayNodeLink y) => x.WayId < y.WayId ? -1 : x.WayId > y.WayId ? 1 : 0;
+        }
+
         private IDatabase Database { get; }
         private IHttpClientFactory HttpClientFactory { get; }
         private TimeSpan MaxAge { get; } = TimeSpan.FromDays(30);
@@ -69,14 +75,13 @@ namespace MapDataServer.Services
                         using (var stream = await result.Content.ReadAsStreamAsync())
                         {
                             var dateThreshold = DateTime.UtcNow - MaxAge;
-
+                            
                             var source = new XmlOsmStreamSource(stream);
 
                             var dbNodes = await Database.MapNodes.Where(mn => mn.SavedDate > dateThreshold).Select(mn => mn.Id).ToListAsync();
                             dbNodes.Sort();
                             var nodes = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Node).Cast<OsmSharp.Node>()
                                 .Where(node => node.Id.HasValue && node.Latitude.HasValue && node.Longitude.HasValue)
-                                .Where(node => dbNodes.BinarySearch(node.Id.Value) == -1)
                                 .ToDictionary(node => node.Id);
 
                             var dbWays = await Database.MapWays.Where(mw => mw.SavedDate > dateThreshold).Select(mw => mw.Id).ToListAsync();
@@ -91,7 +96,10 @@ namespace MapDataServer.Services
                                 .Where(geo => geo.Id.HasValue)
                                 .Where(geo => dbRelations.BinarySearch(geo.Id.Value) == -1);
 
-                            foreach (var node in nodes)
+                            var dbWayNodeLinks = await Database.WayNodeLinks.ToListAsync();
+                            dbWayNodeLinks.Sort(new WayNodeLinkComparer());
+                            
+                            foreach (var node in nodes.Where(node => dbNodes.BinarySearch(node.Key.Value) == -1))
                             {
                                 var dbNode = new MapNode()
                                 {
@@ -140,13 +148,10 @@ namespace MapDataServer.Services
                                             dbWay.MaxLon = node.Longitude;
                                     }
                                     var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value };
-                                    try
+                                    if (dbWayNodeLinks.BinarySearch(dbWNL, new WayNodeLinkComparer()) == -1 &&
+                                        await Database.WayNodeLinks.CountAsync(v => v.NodeId == dbWNL.NodeId && v.WayId == dbWNL.WayId) == 0)
                                     {
                                         await Database.InsertAsync(dbWNL);
-                                    }
-                                    catch (MySql.Data.MySqlClient.MySqlException)
-                                    {
-
                                     }
                                 }
                                 await Database.InsertOrReplaceAsync(dbWay);
