@@ -31,7 +31,8 @@ namespace MapDataServer
         {
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_1);
 
-            services.AddSingleton<IDataProvider, LinqToDB.DataProvider.MySql.MySqlDataProvider>()
+            services.AddSingleton<LinqToDB.DataProvider.MySql.MySqlDataProvider, LinqToDB.DataProvider.MySql.MySqlDataProvider>()
+            .AddSingleton<IDataProvider>(svc => svc.GetService<LinqToDB.DataProvider.MySql.MySqlDataProvider>())
             .AddSingleton<IDatabase, Database>()
             .AddSingleton<IMapDownloader, MapDownloader>()
             .AddHttpClient();

@@ -88,18 +88,18 @@ namespace MapDataServer.Services
                             dbWays.Sort();
                             var ways = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Way).Cast<OsmSharp.Way>()
                                 .Where(geo => geo.Id.HasValue)
-                                .Where(geo => dbNodes.BinarySearch(geo.Id.Value) == -1);
+                                .Where(geo => dbNodes.BinarySearch(geo.Id.Value) < 0);
 
                             var dbRelations = await Database.MapRelations.Where(mr => mr.SavedDate > dateThreshold).Select(mr => mr.Id).ToListAsync();
                             dbRelations.Sort();
                             var relations = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Relation).Cast<OsmSharp.Relation>()
                                 .Where(geo => geo.Id.HasValue)
-                                .Where(geo => dbRelations.BinarySearch(geo.Id.Value) == -1);
+                                .Where(geo => dbRelations.BinarySearch(geo.Id.Value) < 0);
 
                             var dbWayNodeLinks = await Database.WayNodeLinks.ToListAsync();
                             dbWayNodeLinks.Sort(new WayNodeLinkComparer());
                             
-                            foreach (var node in nodes.Where(node => dbNodes.BinarySearch(node.Key.Value) == -1))
+                            foreach (var node in nodes.Where(node => dbNodes.BinarySearch(node.Key.Value) < 0))
                             {
                                 var dbNode = new MapNode()
                                 {
@@ -148,7 +148,7 @@ namespace MapDataServer.Services
                                             dbWay.MaxLon = node.Longitude;
                                     }
                                     var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value };
-                                    if (dbWayNodeLinks.BinarySearch(dbWNL, new WayNodeLinkComparer()) == -1 &&
+                                    if (dbWayNodeLinks.BinarySearch(dbWNL, new WayNodeLinkComparer()) < 0 &&
                                         await Database.WayNodeLinks.CountAsync(v => v.NodeId == dbWNL.NodeId && v.WayId == dbWNL.WayId) == 0)
                                     {
                                         await Database.InsertAsync(dbWNL);
