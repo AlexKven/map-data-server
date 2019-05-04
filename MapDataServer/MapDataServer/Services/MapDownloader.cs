@@ -98,7 +98,8 @@ namespace MapDataServer.Services
 
                             var dbWayNodeLinks = await Database.WayNodeLinks.ToListAsync();
                             dbWayNodeLinks.Sort(new WayNodeLinkComparer());
-                            
+
+                            List<MapNode> dbNodesInsert = new List<MapNode>();
                             foreach (var node in nodes.Where(node => dbNodes.BinarySearch(node.Key.Value) < 0))
                             {
                                 var dbNode = new MapNode()
@@ -110,9 +111,10 @@ namespace MapDataServer.Services
                                     Latitude = node.Value.Latitude.Value,
                                     Longitude = node.Value.Longitude.Value
                                 };
-                                await SaveTagsForGeo(node.Value);
-                                await Database.InsertOrReplaceAsync(dbNode);
+                                //await SaveTagsForGeo(node.Value);
+                                dbNodesInsert.Add(dbNode);
                             }
+                            await Database.BulkInsert(dbNodesInsert);
 
                             foreach (var way in ways)
                             {
