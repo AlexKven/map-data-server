@@ -98,7 +98,7 @@ namespace MapDataServer.Services
             return $"'{fieldValue.Replace("'", "''")}'";
         }
 
-        public async Task BulkInsert<T>(IEnumerable<T> values)
+        public async Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false)
         {
             var type = typeof(T);
             var attribute = type.GetCustomAttributes(false).Where(att => att is TableAttribute).FirstOrDefault() as TableAttribute;
@@ -108,10 +108,10 @@ namespace MapDataServer.Services
                 .Select(prop => (prop,
                 prop.GetCustomAttributes(true).Where(att => att is ColumnAttribute).FirstOrDefault() as ColumnAttribute,
                 prop.GetCustomAttributes(true).Where(att => att is DataTypeAttribute).FirstOrDefault() as DataTypeAttribute))
-                .Where(prop => prop.Item2 != null && (prop.Item2.DataType != DataType.Undefined || prop.Item3.DataType != DataType.Undefined));
+                .Where(prop => prop.Item2 != null);
 
 
-            query.Append($"INSERT INTO `{attribute.Name}`({string.Join(",", propertyInfos.Select(prop => $"`{prop.Item2.Name}`"))}) VALUES ");
+            query.Append($"{(orReplace ? "REPLACE" : "INSERT IGNORE") } INTO `{attribute.Name}`({string.Join(",", propertyInfos.Select(prop => $"`{prop.Item2.Name}`"))}) VALUES ");
 
             bool firstRow = true;
             foreach (var value in values)
@@ -126,7 +126,7 @@ namespace MapDataServer.Services
                 {
                     var dataType = prop.Item2.DataType;
                     if (dataType == DataType.Undefined)
-                        dataType = prop.Item3.DataType.Value;
+                        dataType = prop.Item3.DataType ?? DataType.Undefined;
 
                     string rendered = RenderField(prop.prop.GetValue(value)?.ToString(), dataType);
                     query.Append(first ? rendered : $", {rendered}");

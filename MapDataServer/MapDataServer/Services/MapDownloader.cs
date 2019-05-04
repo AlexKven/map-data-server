@@ -20,6 +20,18 @@ namespace MapDataServer.Services
             public override int Compare(WayNodeLink x, WayNodeLink y) => x.WayId < y.WayId ? -1 : x.WayId > y.WayId ? 1 : 0;
         }
 
+        public class GeoTagComparer : Comparer<GeoTag>
+        {
+            public override int Compare(GeoTag x, GeoTag y)
+            {
+                if (x.GeoId < y.GeoId)
+                    return -1;
+                if (x.GeoId > y.GeoId)
+                    return 1;
+                return string.Compare(x.Key, y.Key);
+            }
+        }
+
         private IDatabase Database { get; }
         private IHttpClientFactory HttpClientFactory { get; }
         private TimeSpan MaxAge { get; } = TimeSpan.FromDays(30);
@@ -29,7 +41,35 @@ namespace MapDataServer.Services
             HttpClientFactory = httpClientFactory;
         }
 
-        private async Task SaveTagsForGeo(OsmSharp.OsmGeo geo)
+        private List<GeoTag> StagedTags { get; } = new List<GeoTag>();
+        private List<MapNode> StagedNodes { get; } = new List<MapNode>();
+        private List<MapWay> StagedWays { get; } = new List<MapWay>();
+        private List<MapRelation> StagedRelations { get; } = new List<MapRelation>();
+        private List<WayNodeLink> StagedWayNodeLinks { get; } = new List<WayNodeLink>();
+        private List<MapRelationMember> StagedRelationMembers { get; } = new List<MapRelationMember>();
+
+        private async Task CommitStaged()
+        {
+            await Database.BulkInsert(StagedTags, false);
+            StagedTags.Clear();
+
+            await Database.BulkInsert(StagedNodes, false);
+            StagedNodes.Clear();
+
+            await Database.BulkInsert(StagedWays, false);
+            StagedWays.Clear();
+
+            await Database.BulkInsert(StagedRelations, false);
+            StagedRelations.Clear();
+
+            await Database.BulkInsert(StagedWayNodeLinks, false);
+            StagedWayNodeLinks.Clear();
+
+            await Database.BulkInsert(StagedRelationMembers, false);
+            StagedRelationMembers.Clear();
+        }
+
+        private void StageTagsForGeo(OsmSharp.OsmGeo geo)
         {
             foreach (var tag in geo.Tags ?? Enumerable.Empty<Tag>())
             {
@@ -40,8 +80,14 @@ namespace MapDataServer.Services
                     Value = tag.Value,
                     GeoType = geo.Type.GetGeoType()
                 };
-                await Database.InsertOrReplaceAsync(dbTag);
+                StagedTags.Add(dbTag);
             }
+        }
+
+        private IEnumerable<T> ConvertOsmSource<T>(IEnumerable<OsmSharp.OsmGeo> source) where T : OsmSharp.OsmGeo
+        {
+            return source.Where(geo => geo.GetType() == typeof(T)).Cast<T>()
+                                .Where(geo => geo.Id.HasValue);
         }
 
         public async Task DownloadMapRegions(int minLon, int minLat, int lengthLon, int lengthLat)
@@ -70,37 +116,38 @@ namespace MapDataServer.Services
                     var httpClient = HttpClientFactory.CreateClient();
                     var result = await httpClient.SendAsync(request);
 
+                    var dateThreshold = DateTime.UtcNow - MaxAge;
+                    Expression<Func<GeoBase, bool>> dateFilter = geo => geo.SavedDate > dateThreshold;
+
+                    Expression<Func<OsmSharp.OsmGeo, bool>> hasIdFilter = osm => osm.Id.HasValue;
+
                     using (result)
                     {
                         using (var stream = await result.Content.ReadAsStreamAsync())
                         {
-                            var dateThreshold = DateTime.UtcNow - MaxAge;
                             
                             var source = new XmlOsmStreamSource(stream);
 
-                            var dbNodes = await Database.MapNodes.Where(mn => mn.SavedDate > dateThreshold).Select(mn => mn.Id).ToListAsync();
+                            var dbNodes = await Database.MapNodes.Where(dateFilter).Select(mn => mn.Id).ToListAsync();
                             dbNodes.Sort();
-                            var nodes = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Node).Cast<OsmSharp.Node>()
-                                .Where(node => node.Id.HasValue && node.Latitude.HasValue && node.Longitude.HasValue)
+                            var osmNodes = ConvertOsmSource<OsmSharp.Node>(source)
+                                .Where(node => node.Latitude.HasValue && node.Longitude.HasValue)
                                 .ToDictionary(node => node.Id);
 
-                            var dbWays = await Database.MapWays.Where(mw => mw.SavedDate > dateThreshold).Select(mw => mw.Id).ToListAsync();
+                            var dbWays = await Database.MapWays.Where(dateFilter).Select(mw => mw.Id).ToListAsync();
                             dbWays.Sort();
-                            var ways = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Way).Cast<OsmSharp.Way>()
-                                .Where(geo => geo.Id.HasValue)
+                            var osmWays = ConvertOsmSource<OsmSharp.Way>(source)
                                 .Where(geo => dbNodes.BinarySearch(geo.Id.Value) < 0);
 
-                            var dbRelations = await Database.MapRelations.Where(mr => mr.SavedDate > dateThreshold).Select(mr => mr.Id).ToListAsync();
+                            var dbRelations = await Database.MapRelations.Where(dateFilter).Select(mr => mr.Id).ToListAsync();
                             dbRelations.Sort();
-                            var relations = source.Where(geo => geo.Type == OsmSharp.OsmGeoType.Relation).Cast<OsmSharp.Relation>()
-                                .Where(geo => geo.Id.HasValue)
+                            var osmRelations = ConvertOsmSource<OsmSharp.Relation>(source)
                                 .Where(geo => dbRelations.BinarySearch(geo.Id.Value) < 0);
 
                             var dbWayNodeLinks = await Database.WayNodeLinks.ToListAsync();
                             dbWayNodeLinks.Sort(new WayNodeLinkComparer());
 
-                            List<MapNode> dbNodesInsert = new List<MapNode>();
-                            foreach (var node in nodes.Where(node => dbNodes.BinarySearch(node.Key.Value) < 0))
+                            foreach (var node in osmNodes.Where(node => dbNodes.BinarySearch(node.Key.Value) < 0))
                             {
                                 var dbNode = new MapNode()
                                 {
@@ -111,12 +158,13 @@ namespace MapDataServer.Services
                                     Latitude = node.Value.Latitude.Value,
                                     Longitude = node.Value.Longitude.Value
                                 };
-                                //await SaveTagsForGeo(node.Value);
-                                dbNodesInsert.Add(dbNode);
+                                StageTagsForGeo(node.Value);
+                                StagedNodes.Add(dbNode);
                             }
-                            await Database.BulkInsert(dbNodesInsert);
 
-                            foreach (var way in ways)
+                            await CommitStaged();
+
+                            foreach (var way in osmWays)
                             {
                                 var dbWay = new MapWay()
                                 {
@@ -125,11 +173,11 @@ namespace MapDataServer.Services
                                     SavedDate = DateTime.UtcNow,
                                     IsVisible = way.Visible
                                 };
-                                await SaveTagsForGeo(way);
+                                StageTagsForGeo(way);
                                 bool minMaxSet = false;
                                 foreach (var nodeId in way.Nodes ?? new long[0])
                                 {
-                                    var node = nodes[nodeId];
+                                    var node = osmNodes[nodeId];
                                     if (!minMaxSet)
                                     {
                                         dbWay.MinLat = node.Latitude;
@@ -150,16 +198,14 @@ namespace MapDataServer.Services
                                             dbWay.MaxLon = node.Longitude;
                                     }
                                     var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value };
-                                    if (dbWayNodeLinks.BinarySearch(dbWNL, new WayNodeLinkComparer()) < 0 &&
-                                        await Database.WayNodeLinks.CountAsync(v => v.NodeId == dbWNL.NodeId && v.WayId == dbWNL.WayId) == 0)
-                                    {
-                                        await Database.InsertAsync(dbWNL);
-                                    }
+                                    StagedWayNodeLinks.Add(dbWNL);
                                 }
-                                await Database.InsertOrReplaceAsync(dbWay);
+                                StagedWays.Add(dbWay);
                             }
 
-                            foreach (var relation in relations)
+                            await CommitStaged();
+
+                            foreach (var relation in osmRelations)
                             {
                                 if (!relation.Id.HasValue)
                                     continue;
@@ -170,10 +216,10 @@ namespace MapDataServer.Services
                                     SavedDate = DateTime.UtcNow,
                                     IsVisible = relation.Visible
                                 };
-                                await SaveTagsForGeo(relation);
+                                StageTagsForGeo(relation);
                                 foreach (var member in relation.Members)
                                 {
-                                    await Database.InsertOrReplaceAsync(new MapRelationMember()
+                                    StagedRelationMembers.Add(new MapRelationMember()
                                     {
                                         RelationId = relation.Id.Value,
                                         GeoId = member.Id,
@@ -181,8 +227,10 @@ namespace MapDataServer.Services
                                         Role = member.Role
                                     });
                                 }
-                                await Database.InsertOrReplaceAsync(dbRelation);
+                                StagedRelations.Add(dbRelation);
                             }
+
+                            await CommitStaged();
                         }
                     }
                 }

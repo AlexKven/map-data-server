@@ -20,6 +20,6 @@ namespace MapDataServer.Services
         ITable<WayNodeLink> WayNodeLinks { get; }
         Task Initializer { get; }
 
-        Task BulkInsert<T>(IEnumerable<T> values);
+        Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false);
     }
 }
