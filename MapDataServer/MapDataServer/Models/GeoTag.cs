@@ -13,9 +13,9 @@ namespace MapDataServer.Models
         public long GeoId { get; set; }
         [Column(Name = nameof(Type)), NotNull, DataType("VARCHAR(8)")]
         public GeoType GeoType { get; set; }
-        [Column(Name = nameof(Key)), PrimaryKey, NotNull, DataType("VARCHAR(32)")]
+        [Column(Name = nameof(Key)), PrimaryKey, NotNull, DataType("VARCHAR(64)")]
         public string Key { get; set; }
-        [Column(Name = nameof(Value)), DataType("VARCHAR(32)")]
+        [Column(Name = nameof(Value)), DataType("TEXT")]
         public string Value { get; set; }
     }
 }

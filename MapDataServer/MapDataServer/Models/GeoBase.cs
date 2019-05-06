@@ -11,10 +11,10 @@ namespace MapDataServer.Models
         [Column(Name = nameof(Id)), PrimaryKey, NotNull, DataType(LinqToDB.DataType.Int64)]
         public long Id { get; set; }
 
-        [Column(Name = nameof(GeneratedDate)), DataType(LinqToDB.DataType.DateTime)]
+        [Column(Name = nameof(GeneratedDate)), DataType(LinqToDB.DataType.Date)]
         public DateTime? GeneratedDate { get; set; }
 
-        [Column(Name = nameof(SavedDate)), DataType(LinqToDB.DataType.DateTime), NotNull]
+        [Column(Name = nameof(SavedDate)), DataType(LinqToDB.DataType.Date), NotNull]
         public DateTime SavedDate { get; set; }
 
         [Column(Name = nameof(IsVisible)), DataType(LinqToDB.DataType.Boolean)]

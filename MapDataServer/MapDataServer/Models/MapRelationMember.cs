@@ -18,7 +18,7 @@ namespace MapDataServer.Models
         [Column(Name = nameof(Type)), NotNull, DataType("VARCHAR(8)")]
         public GeoType GeoType { get; set; }
 
-        [Column(Name = nameof(Role)), DataType("VARCHAR(32)")]
+        [Column(Name = nameof(Role)), DataType("VARCHAR(128)")]
         public string Role { get; set; }
     }
 }

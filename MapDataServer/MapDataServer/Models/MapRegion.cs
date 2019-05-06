@@ -57,7 +57,7 @@ namespace MapDataServer.Models
             set => Value = GetValue(Lon, value);
         }
 
-        [Column(Name = nameof(SavedDate)), DataType(LinqToDB.DataType.DateTime), NotNull]
+        [Column(Name = nameof(SavedDate)), DataType(LinqToDB.DataType.Date), NotNull]
         public DateTime SavedDate { get; set; }
     }
 }

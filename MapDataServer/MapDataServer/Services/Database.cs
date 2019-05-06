@@ -47,6 +47,10 @@ namespace MapDataServer.Services
             if (!tableTypes.Contains("MapNodes"))
             {
                 await this.CreateTableAsync<MapNode>();
+                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX LonLat(Longitude, Latitude)");
+                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX LatLon(Latitude, Longitude);");
+                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX SavedDate(SavedDate);");
+                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX Region(Region);");
             }
             if (!tableTypes.Contains("MapRegions"))
             {
@@ -55,18 +59,27 @@ namespace MapDataServer.Services
             if (!tableTypes.Contains("MapRelations"))
             {
                 await this.CreateTableAsync<MapRelation>();
+                await this.ExecuteAsync("ALTER TABLE MapRelations ADD INDEX SavedDate(SavedDate);");
             }
             if (!tableTypes.Contains("MapRelationMembers"))
             {
                 await this.CreateTableAsync<MapRelationMember>();
+                await this.ExecuteAsync("ALTER TABLE MapRelationMembers ADD INDEX GeoId(GeoId);");
+                await this.ExecuteAsync("ALTER TABLE MapRelationMembers ADD INDEX `Type`(`Type`);");
             }
             if (!tableTypes.Contains("MapWays"))
             {
                 await this.CreateTableAsync<MapWay>();
+                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX SavedDate(SavedDate);");
+                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLonLat(MinLon, MinLat);");
+                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLatLon(MinLat, MinLon);");
+                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLonLat(MaxLon, MaxLat);");
+                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLatLon(MaxLat, MaxLon);");
             }
             if (!tableTypes.Contains("WayNodeLinks"))
             {
                 await this.CreateTableAsync<WayNodeLink>();
+                await this.ExecuteAsync("ALTER TABLE WayNodeLinks ADD INDEX WayId(WayId);");
             }
         }
 

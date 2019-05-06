@@ -175,6 +175,7 @@ namespace MapDataServer.Services
                                 };
                                 StageTagsForGeo(way);
                                 bool minMaxSet = false;
+                                ushort wnlIndex = 0;
                                 foreach (var nodeId in way.Nodes ?? new long[0])
                                 {
                                     var node = osmNodes[nodeId];
@@ -197,7 +198,7 @@ namespace MapDataServer.Services
                                         if (dbWay.MaxLon < node.Longitude)
                                             dbWay.MaxLon = node.Longitude;
                                     }
-                                    var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value };
+                                    var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value, ItemIndex = wnlIndex++ };
                                     StagedWayNodeLinks.Add(dbWNL);
                                 }
                                 StagedWays.Add(dbWay);

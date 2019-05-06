@@ -30,7 +30,8 @@ namespace MapDataServer.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<string>>> Get()
         {
-            await MapDownloader.DownloadMapRegions(-12235, 4742, 2, 2);
+            await Database.Initializer;
+            await MapDownloader.DownloadMapRegions(-12245, 4728, 22, 15);
 
             //await Database.Initializer;
             //var httpClient = HttpClientFactory.CreateClient();
