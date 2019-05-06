@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -111,23 +112,16 @@ namespace MapDataServer.Services
             return $"'{fieldValue.Replace("'", "''")}'";
         }
 
-        public async Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false)
+        private async Task<bool> BulkInserting<T>(IEnumerator<T> enumerator, bool orReplace,
+            TableAttribute tableAttribute, IEnumerable<(PropertyInfo prop, ColumnAttribute, DataTypeAttribute)> propertyInfos)
         {
-            var type = typeof(T);
-            var attribute = type.GetCustomAttributes(false).Where(att => att is TableAttribute).FirstOrDefault() as TableAttribute;
-
             StringBuilder query = new StringBuilder();
-            var propertyInfos = type.GetProperties()
-                .Select(prop => (prop,
-                prop.GetCustomAttributes(true).Where(att => att is ColumnAttribute).FirstOrDefault() as ColumnAttribute,
-                prop.GetCustomAttributes(true).Where(att => att is DataTypeAttribute).FirstOrDefault() as DataTypeAttribute))
-                .Where(prop => prop.Item2 != null);
+            query.Append($"{(orReplace ? "REPLACE" : "INSERT IGNORE") } INTO `{tableAttribute.Name}`({string.Join(",", propertyInfos.Select(prop => $"`{prop.Item2.Name}`"))}) VALUES ");
 
-
-            query.Append($"{(orReplace ? "REPLACE" : "INSERT IGNORE") } INTO `{attribute.Name}`({string.Join(",", propertyInfos.Select(prop => $"`{prop.Item2.Name}`"))}) VALUES ");
-
+            int maxQueryLength = 1000000;
             bool firstRow = true;
-            foreach (var value in values)
+            bool continues = false;
+            while (query.Length < maxQueryLength && (continues = enumerator.MoveNext()))
             {
                 if (!firstRow)
                     query.Append(",");
@@ -141,7 +135,7 @@ namespace MapDataServer.Services
                     if (dataType == DataType.Undefined)
                         dataType = prop.Item3.DataType ?? DataType.Undefined;
 
-                    string rendered = RenderField(prop.prop.GetValue(value)?.ToString(), dataType);
+                    string rendered = RenderField(prop.prop.GetValue(enumerator.Current)?.ToString(), dataType);
                     query.Append(first ? rendered : $", {rendered}");
                     first = false;
                 }
@@ -150,8 +144,24 @@ namespace MapDataServer.Services
             query.Append(";");
 
             if (firstRow)
-                return;
+                return true;
             var affected = await this.ExecuteAsync(query.ToString());
+            return !continues;
+        }
+
+        public async Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false)
+        {
+            var type = typeof(T);
+            var tableAttribute = type.GetCustomAttributes(false).Where(att => att is TableAttribute).FirstOrDefault() as TableAttribute;
+
+            var propertyInfos = type.GetProperties()
+                .Select(prop => (prop,
+                prop.GetCustomAttributes(true).Where(att => att is ColumnAttribute).FirstOrDefault() as ColumnAttribute,
+                prop.GetCustomAttributes(true).Where(att => att is DataTypeAttribute).FirstOrDefault() as DataTypeAttribute))
+                .Where(prop => prop.Item2 != null);
+
+            var enumerator = values.GetEnumerator();
+            while (!await BulkInserting(enumerator, orReplace, tableAttribute, propertyInfos)) ;
         }
     }
 }
