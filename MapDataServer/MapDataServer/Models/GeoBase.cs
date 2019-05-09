@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MapDataServer.Models
 {
-    public abstract class GeoBase
+    public abstract class GeoBase : IEquatable<GeoBase>
     {
         [Column(Name = nameof(Id)), PrimaryKey, NotNull, DataType(LinqToDB.DataType.Int64)]
         public long Id { get; set; }
@@ -19,5 +19,32 @@ namespace MapDataServer.Models
 
         [Column(Name = nameof(IsVisible)), DataType(LinqToDB.DataType.Boolean)]
         public bool? IsVisible { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            return ((obj as GeoBase)?.Id == Id);
+        }
+
+        public bool Equals(GeoBase other)
+        {
+            return other?.Id == Id;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Id);
+        }
+
+        public static bool operator ==(GeoBase left, GeoBase right)
+        {
+            if (left == null || right == null)
+                return left == null && right == null;
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(GeoBase left, GeoBase right)
+        {
+            return !(left == right);
+        }
     }
 }
