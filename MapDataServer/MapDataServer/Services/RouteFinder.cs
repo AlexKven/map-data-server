@@ -30,7 +30,6 @@ namespace MapDataServer.Services
         {
             return Database.MapNodes.OrderBy(
                 node => Distance(node.Longitude, lon, node.Latitude, lat)).ToAsyncEnumerable();
-            
         }
 
         class StepEnumerator : IAsyncEnumerator<(MapWay, MapNode)>
@@ -40,8 +39,13 @@ namespace MapDataServer.Services
             double DestLon;
             double DestLat;
 
-            IAsyncEnumerator<MapWay> WaysCrossingNode = null;
-            IAsyncEnumerator<MapNode> NodesOnWay = null;
+            public List<MapNode> ExcludedNodes { get; } = new List<MapNode>();
+            public List<MapWay> ExcludedWays { get; } = new List<MapWay>();
+
+            int currentWCN = -1;
+            List<MapWay> WaysCrossingNode = null;
+            int currentNOW = -1;
+            List<MapNode> NodesOnWay = null;
 
             public StepEnumerator(IDatabase database, MapNode currentNode, double destLon, double destLat)
             {
@@ -49,6 +53,7 @@ namespace MapDataServer.Services
                 CurrentNode = currentNode;
                 DestLon = destLon;
                 DestLat = destLat;
+                ExcludedNodes.Add(currentNode);
             }
 
             public (MapWay, MapNode) Current
@@ -58,34 +63,37 @@ namespace MapDataServer.Services
                     if (WaysCrossingNode == null)
                         return (null, null);
 
-                    return (WaysCrossingNode.Current, NodesOnWay.Current);
+                    return (WaysCrossingNode[currentWCN], NodesOnWay[currentNOW]);
                 }
             }
 
             public void Dispose()
             {
-                WaysCrossingNode?.Dispose();
-                NodesOnWay?.Dispose();
             }
 
-            private IAsyncEnumerable<MapWay> GetWaysCrossingNode(MapNode node, MapWay exclude = null)
+            private async Task<List<MapWay>> GetWaysCrossingNode(MapNode node, params MapWay[] exclude)
             {
                 var query = from way in Database.MapWays
                             join link in Database.WayNodeLinks
                             on new { NodeId = node.Id, WayId = way.Id }
                             equals new { NodeId = link.NodeId, WayId = link.WayId }
                             select way;
-                return (query).ToAsyncEnumerable();
+                var result = await query.ToAsyncEnumerable().ToList();
+                result.RemoveAll(way => exclude?.Contains(way) ?? false);
+                return result;
             }
 
-            private IAsyncEnumerable<MapNode> GetNodesOnWay(MapWay way, double destLon, double destLat, MapNode exclude = null)
+            private async Task<List<MapNode>> GetNodesOnWay(MapWay way, double destLon, double destLat, params MapNode[] exclude)
             {
-                return (from node in Database.MapNodes
-                        join link in Database.WayNodeLinks
-                        on new { WayId = way.Id, NodeId = node.Id }
-                        equals new { WayId = link.WayId, NodeId = link.NodeId }
-                        orderby Math.Sqrt((node.Longitude - destLon) * (node.Longitude - destLon) + (node.Latitude - destLat)) ascending // Distance(node.Longitude, node.Latitude, destLon, destLat) ascending
-                        select node).ToAsyncEnumerable();
+                var query = from node in Database.MapNodes
+                            join link in Database.WayNodeLinks
+                            on new { WayId = way.Id, NodeId = node.Id }
+                            equals new { WayId = link.WayId, NodeId = link.NodeId }
+                            orderby Math.Sqrt((node.Longitude - destLon) * (node.Longitude - destLon) + (node.Latitude - destLat)) ascending // Distance(node.Longitude, node.Latitude, destLon, destLat) ascending
+                            select node;
+                var result = await query.ToAsyncEnumerable().ToList();
+                result.RemoveAll(node => exclude?.Contains(node) ?? false);
+                return result;
             }
 
             public async Task<bool> MoveNext(CancellationToken cancellationToken)
@@ -95,24 +103,25 @@ namespace MapDataServer.Services
                 {
                     if (WaysCrossingNode == null)
                     {
-                        WaysCrossingNode = GetWaysCrossingNode(CurrentNode).GetEnumerator();
+                        WaysCrossingNode = await GetWaysCrossingNode(CurrentNode, ExcludedWays.ToArray());
+                        ExcludedWays.AddRange(WaysCrossingNode);
                     }
                     if (NodesOnWay == null)
                     {
-                        if (!await WaysCrossingNode.MoveNext())
+                        if (++currentWCN >= WaysCrossingNode.Count)
                             return false;
-                        NodesOnWay = GetNodesOnWay(WaysCrossingNode.Current, DestLon, DestLat, CurrentNode).GetEnumerator();
+                        NodesOnWay = await GetNodesOnWay(WaysCrossingNode[currentWCN], DestLon, DestLat, ExcludedNodes.ToArray());
                     }
-                    if (!await NodesOnWay.MoveNext())
+                    if (++currentNOW >= NodesOnWay.Count)
                     {
-                        NodesOnWay.Dispose();
+                        currentNOW = -1;
                         NodesOnWay = null;
                     }
                     else
                     {
                         found = (await (from link in Database.WayNodeLinks
-                                        where link.NodeId == NodesOnWay.Current.Id
-                                        && link.WayId != WaysCrossingNode.Current.Id
+                                        where link.NodeId == NodesOnWay[currentNOW].Id
+                                        && link.WayId != WaysCrossingNode[currentWCN].Id
                                         select link).ToAsyncEnumerable().Count()) > 0;
                     }
                 }
@@ -166,9 +175,26 @@ namespace MapDataServer.Services
         {
             var nextStep = new StepEnumerator(Database, await Database.MapNodes.Where(n => n.Id == 267814842).ToAsyncEnumerable().First(), -122.3690414429, 47.2863121033);
 
+            string list = "";
             while (await nextStep.MoveNext())
             {
-                var cur = nextStep.Current;
+                var currentNode = nextStep.Current.Item2;
+                list += currentNode.Latitude.ToString() + "," + currentNode.Longitude.ToString() + "\n";
+                var nextNextStep = new StepEnumerator(Database, currentNode, -122.3690414429, 47.2863121033);
+                nextNextStep.ExcludedWays.Add(nextStep.Current.Item1);
+                while (await nextNextStep.MoveNext())
+                {
+                    var currentNextNode = nextNextStep.Current.Item2;
+                    list += currentNextNode.Latitude.ToString() + "," + currentNextNode.Longitude.ToString() + "\n";
+                    var nnnStep = new StepEnumerator(Database, currentNextNode, -122.3690414429, 47.2863121033);
+                    nnnStep.ExcludedWays.Add(nextNextStep.Current.Item1);
+                    nnnStep.ExcludedWays.Add(nextStep.Current.Item1);
+                    while (await nnnStep.MoveNext())
+                    {
+                        var currentNNNode = nnnStep.Current.Item2;
+                        list += currentNNNode.Latitude.ToString() + "," + currentNNNode.Longitude.ToString() + "\n";
+                    }
+                }
             }
         }
         
