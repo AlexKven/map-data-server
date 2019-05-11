@@ -44,9 +44,53 @@ namespace MapDataServer.Services
         private List<GeoTag> StagedTags { get; } = new List<GeoTag>();
         private List<MapNode> StagedNodes { get; } = new List<MapNode>();
         private List<MapWay> StagedWays { get; } = new List<MapWay>();
+        private List<MapHighway> StagedHighways { get; } = new List<MapHighway>();
         private List<MapRelation> StagedRelations { get; } = new List<MapRelation>();
         private List<WayNodeLink> StagedWayNodeLinks { get; } = new List<WayNodeLink>();
         private List<MapRelationMember> StagedRelationMembers { get; } = new List<MapRelationMember>();
+
+        private bool TryConvertSpeedToKmh(string speed, out float kmh)
+        {
+            if (float.TryParse(speed.Trim(), out kmh))
+                return true;
+            if (speed.Contains("km/h"))
+            {
+                speed = speed.Replace("km/h", "");
+                if (float.TryParse(speed.Trim(), out kmh))
+                    return true;
+            }
+            else if (speed.Contains("kph"))
+            {
+                speed = speed.Replace("kph", "");
+                if (float.TryParse(speed.Trim(), out kmh))
+                    return true;
+            }
+            else if (speed.Contains("kmph"))
+            {
+                speed = speed.Replace("kmph", "");
+                if (float.TryParse(speed.Trim(), out kmh))
+                    return true;
+            }
+            else if (speed.Contains("mph"))
+            {
+                speed = speed.Replace("mph", "");
+                if (float.TryParse(speed.Trim(), out kmh))
+                {
+                    kmh *= 1.6093f;
+                    return true;
+                }
+            }
+            else if (speed.Contains("knots"))
+            {
+                speed = speed.Replace("knots", "");
+                if (float.TryParse(speed.Trim(), out kmh))
+                {
+                    kmh *= 0.869f;
+                    return true;
+                }
+            }
+            return false;
+        }
 
         private async Task CommitStaged()
         {
@@ -59,6 +103,9 @@ namespace MapDataServer.Services
             await Database.BulkInsert(StagedWays, false);
             StagedWays.Clear();
 
+            await Database.BulkInsert(StagedHighways, false);
+            StagedHighways.Clear();
+
             await Database.BulkInsert(StagedRelations, false);
             StagedRelations.Clear();
 
@@ -69,7 +116,7 @@ namespace MapDataServer.Services
             StagedRelationMembers.Clear();
         }
 
-        private void StageTagsForGeo(OsmSharp.OsmGeo geo)
+        private void StageTagsForGeo(OsmSharp.OsmGeo geo, bool highway = false)
         {
             foreach (var tag in geo.Tags ?? Enumerable.Empty<Tag>())
             {
@@ -78,7 +125,7 @@ namespace MapDataServer.Services
                     GeoId = geo.Id.Value,
                     Key = tag.Key,
                     Value = tag.Value,
-                    GeoType = geo.Type.GetGeoType()
+                    GeoType = geo.Type.GetGeoType(highway)
                 };
                 StagedTags.Add(dbTag);
             }
@@ -166,14 +213,182 @@ namespace MapDataServer.Services
 
                             foreach (var way in osmWays)
                             {
-                                var dbWay = new MapWay()
+                                MapWay dbWay;
+                                bool highway = way.Tags?.ContainsKey("highway") ?? false;
+                                if (highway)
                                 {
-                                    Id = way.Id.Value,
-                                    GeneratedDate = way.TimeStamp,
-                                    SavedDate = DateTime.UtcNow,
-                                    IsVisible = way.Visible
-                                };
-                                StageTagsForGeo(way);
+                                    dbWay = new MapHighway();
+                                    var dbHighway = (MapHighway)dbWay;
+                                    if (way.Tags.TryGetValue("highway", out var value))
+                                    {
+                                        dbHighway.HighwayType = value;
+                                        way.Tags.RemoveKey("highway");
+                                    }
+                                    if (way.Tags.TryGetValue("sidewalk", out value))
+                                    {
+                                        dbHighway.Sidewalk = value;
+                                        way.Tags.RemoveKey("sidewalk");
+                                    }
+                                    if (way.Tags.TryGetValue("cycleway", out value))
+                                    {
+                                        dbHighway.CyclewayType = value;
+                                        way.Tags.RemoveKey("cycleway");
+                                    }
+                                    if (way.Tags.TryGetValue("busway", out value) && value == "lane")
+                                    {
+                                        dbHighway.BusWay = true;
+                                    }
+                                    if (way.Tags.TryGetValue("abutters", out value))
+                                    {
+                                        dbHighway.Abutters = value;
+                                        way.Tags.RemoveKey("abutters");
+                                    }
+                                    if (way.Tags.TryGetValue("bicycle_road", out value) && value == "yes")
+                                    {
+                                        dbHighway.BicycleRoad = true;
+                                    }
+                                    if (way.Tags.TryGetValue("incline", out value))
+                                    {
+                                        dbHighway.Incline = value;
+                                        way.Tags.RemoveKey("incline");
+                                    }
+                                    if (way.Tags.TryGetValue("junction", out value))
+                                    {
+                                        dbHighway.Junction = value;
+                                        way.Tags.RemoveKey("junction");
+                                    }
+                                    if (way.Tags.TryGetValue("lanes", out value) && byte.TryParse(value, out var num))
+                                    {
+                                        dbHighway.Lanes = num;
+                                        way.Tags.RemoveKey("lanes");
+                                    }
+                                    if (way.Tags.TryGetValue("motorroad", out value))
+                                    {
+                                        dbHighway.MotorRoad = value;
+                                        way.Tags.RemoveKey("motorroad");
+                                    }
+                                    if (way.Tags.TryGetValue("parking:condition", out value))
+                                    {
+                                        dbHighway.ParkingCondition = value;
+                                        way.Tags.RemoveKey("parking:condition");
+                                    }
+                                    if (way.Tags.TryGetValue("parking:lane", out value))
+                                    {
+                                        dbHighway.ParkingLane = value;
+                                        way.Tags.RemoveKey("parking:lane");
+                                    }
+                                    if (way.Tags.TryGetValue("service", out value))
+                                    {
+                                        dbHighway.Service = value;
+                                        way.Tags.RemoveKey("service");
+                                    }
+                                    if (way.Tags.TryGetValue("surface", out value))
+                                    {
+                                        dbHighway.Surface = value;
+                                        way.Tags.RemoveKey("surface");
+                                    }
+                                    if (way.Tags.TryGetValue("maxwidth", out value))
+                                    {
+                                        dbHighway.MaxWidth = value;
+                                        way.Tags.RemoveKey("maxwidth");
+                                    }
+                                    if (way.Tags.TryGetValue("maxheight", out value))
+                                    {
+                                        dbHighway.MaxHeight = value;
+                                        way.Tags.RemoveKey("maxheight");
+                                    }
+                                    if (way.Tags.TryGetValue("maxweight", out value))
+                                    {
+                                        dbHighway.MaxWeight = value;
+                                        way.Tags.RemoveKey("maxweight");
+                                    }
+                                    if (way.Tags.TryGetValue("maxspeed", out value) && TryConvertSpeedToKmh(value, out var speed))
+                                    {
+                                        dbHighway.MaxSpeed = speed;
+                                        way.Tags.RemoveKey("maxspeed");
+                                    }
+                                    if (way.Tags.TryGetValue("oneway", out value))
+                                    {
+                                        dbHighway.OneWay = value;
+                                        way.Tags.RemoveKey("oneway");
+                                    }
+
+                                    if (way.Tags.TryGetValue("turn:lanes", out value))
+                                    {
+                                        dbHighway.TurnLanes = value;
+                                        way.Tags.RemoveKey("turn:lanes");
+                                    }
+                                    if (way.Tags.TryGetValue("destination:lanes", out value))
+                                    {
+                                        dbHighway.DestinationLanes = value;
+                                        way.Tags.RemoveKey("destination:lanes");
+                                    }
+                                    if (way.Tags.TryGetValue("width:lanes", out value))
+                                    {
+                                        dbHighway.WidthLanes = value;
+                                        way.Tags.RemoveKey("width:lanes");
+                                    }
+                                    if (way.Tags.TryGetValue("hov:lanes", out value))
+                                    {
+                                        dbHighway.HovLanes = value;
+                                        way.Tags.RemoveKey("hov:lanes");
+                                    }
+
+                                    if (way.Tags.TryGetValue("turn:lanes:forward", out value))
+                                    {
+                                        dbHighway.TurnLanesForward = value;
+                                        way.Tags.RemoveKey("turn:lanes:forward");
+                                    }
+                                    if (way.Tags.TryGetValue("destination:lanes:forward", out value))
+                                    {
+                                        dbHighway.DestinationLanesForward = value;
+                                        way.Tags.RemoveKey("destination:lanes:forward");
+                                    }
+                                    if (way.Tags.TryGetValue("width:lanes:forward", out value))
+                                    {
+                                        dbHighway.WidthLanesForward = value;
+                                        way.Tags.RemoveKey("width:lanes:forward");
+                                    }
+                                    if (way.Tags.TryGetValue("hov:lanes:forward", out value))
+                                    {
+                                        dbHighway.HovLanesForward = value;
+                                        way.Tags.RemoveKey("hov:lanes:forward");
+                                    }
+
+                                    if (way.Tags.TryGetValue("turn:lanes:backward", out value))
+                                    {
+                                        dbHighway.TurnLanesBackward = value;
+                                        way.Tags.RemoveKey("turn:lanes:backward");
+                                    }
+                                    if (way.Tags.TryGetValue("destination:lanes:backward", out value))
+                                    {
+                                        dbHighway.DestinationLanesBackward = value;
+                                        way.Tags.RemoveKey("destination:lanes:backward");
+                                    }
+                                    if (way.Tags.TryGetValue("width:lanes:backward", out value))
+                                    {
+                                        dbHighway.WidthLanesBackward = value;
+                                        way.Tags.RemoveKey("width:lanes:backward");
+                                    }
+                                    if (way.Tags.TryGetValue("hov:lanes:backward", out value))
+                                    {
+                                        dbHighway.HovLanesBackward = value;
+                                        way.Tags.RemoveKey("hov:lanes:backward");
+                                    }
+                                    StageTagsForGeo(way, true);
+                                }
+                                else
+                                {
+                                    dbWay = new MapWay();
+                                    StageTagsForGeo(way);
+                                }
+
+
+                                dbWay.Id = way.Id.Value;
+                                dbWay.GeneratedDate = way.TimeStamp;
+                                dbWay.SavedDate = DateTime.UtcNow;
+                                dbWay.IsVisible = way.Visible;
+
                                 bool minMaxSet = false;
                                 ushort wnlIndex = 0;
                                 foreach (var nodeId in way.Nodes ?? new long[0])
@@ -198,10 +413,18 @@ namespace MapDataServer.Services
                                         if (dbWay.MaxLon < node.Longitude)
                                             dbWay.MaxLon = node.Longitude;
                                     }
-                                    var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value, ItemIndex = wnlIndex++ };
+                                    var dbWNL = new WayNodeLink() { NodeId = nodeId, WayId = way.Id.Value, ItemIndex = wnlIndex++, Highway = highway };
                                     StagedWayNodeLinks.Add(dbWNL);
                                 }
-                                StagedWays.Add(dbWay);
+
+                                if (highway)
+                                {
+                                    StagedHighways.Add((MapHighway)dbWay);
+                                }
+                                else
+                                {
+                                    StagedWays.Add(dbWay);
+                                }
                             }
 
                             await CommitStaged();

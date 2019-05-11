@@ -11,6 +11,8 @@ namespace MapDataServer.Models
         Node,
         [LinqToDB.Mapping.MapValue(Value = "Way")]
         Way,
+        [LinqToDB.Mapping.MapValue(Value = "Highway")]
+        Highway,
         [LinqToDB.Mapping.MapValue(Value = "Relation")]
         Relation
     }

@@ -32,7 +32,7 @@ namespace MapDataServer.Services
                 node => Distance(node.Longitude, lon, node.Latitude, lat)).ToAsyncEnumerable();
         }
 
-        class StepEnumerator : IAsyncEnumerator<(MapWay, MapNode)>
+        class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode)>
         {
             IDatabase Database;
             MapNode CurrentNode;
@@ -40,10 +40,10 @@ namespace MapDataServer.Services
             double DestLat;
 
             public List<MapNode> ExcludedNodes { get; } = new List<MapNode>();
-            public List<MapWay> ExcludedWays { get; } = new List<MapWay>();
+            public List<MapHighway> ExcludedWays { get; } = new List<MapHighway>();
 
             int currentWCN = -1;
-            List<MapWay> WaysCrossingNode = null;
+            List<MapHighway> WaysCrossingNode = null;
             int currentNOW = -1;
             List<MapNode> NodesOnWay = null;
 
@@ -56,7 +56,7 @@ namespace MapDataServer.Services
                 ExcludedNodes.Add(currentNode);
             }
 
-            public (MapWay, MapNode) Current
+            public (MapHighway, MapNode) Current
             {
                 get
                 {
@@ -71,9 +71,9 @@ namespace MapDataServer.Services
             {
             }
 
-            private async Task<List<MapWay>> GetWaysCrossingNode(MapNode node, params MapWay[] exclude)
+            private async Task<List<MapHighway>> GetWaysCrossingNode(MapNode node, params MapHighway[] exclude)
             {
-                var query = from way in Database.MapWays
+                var query = from way in Database.MapHighways
                             join link in Database.WayNodeLinks
                             on new { NodeId = node.Id, WayId = way.Id }
                             equals new { NodeId = link.NodeId, WayId = link.WayId }
@@ -83,7 +83,7 @@ namespace MapDataServer.Services
                 return result;
             }
 
-            private async Task<List<MapNode>> GetNodesOnWay(MapWay way, double destLon, double destLat, params MapNode[] exclude)
+            private async Task<List<MapNode>> GetNodesOnWay(MapHighway way, double destLon, double destLat, params MapNode[] exclude)
             {
                 var query = from node in Database.MapNodes
                             join link in Database.WayNodeLinks
@@ -129,7 +129,7 @@ namespace MapDataServer.Services
             }
         }
 
-        //public async Task<(MapWay, MapNode)> FindNextStep(MapNode current, MapWay way)
+        //public async Task<(MapHighway, MapNode)> FindNextStep(MapNode current, MapHighway way)
         //{
         //    var nodesOnWay = from node in Database.MapNodes
         //                     join link in Database.WayNodeLinks
@@ -144,7 +144,7 @@ namespace MapDataServer.Services
         //    int down = 0;
         //    MapNode upNode = null;
         //    MapNode downNode = null;
-        //    MapWay selectedWay = null;
+        //    MapHighway selectedWay = null;
         //    while (up != -1 && down != -1)
         //    {
         //        if (up != -1)
@@ -197,9 +197,9 @@ namespace MapDataServer.Services
                 }
             }
         }
-        
 
-        //public IAsyncEnumerable<(MapWay way, MapNode next)> FindNextSteps(double destLon, double destLat, IEnumerable<MapNode> previousNodes)
+
+        //public IAsyncEnumerable<(MapHighway way, MapNode next)> FindNextSteps(double destLon, double destLat, IEnumerable<MapNode> previousNodes)
 
         public async Task<IEnumerable<WaySegment>> FindRoute(IEnumerable<(double lon, double lat)> approximatePath)
         {

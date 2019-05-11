@@ -35,6 +35,8 @@ namespace MapDataServer.Services
 
         public ITable<MapWay> MapWays => GetTable<MapWay>();
 
+        public ITable<MapHighway> MapHighways => GetTable<MapHighway>();
+
         public ITable<WayNodeLink> WayNodeLinks => GetTable<WayNodeLink>();
 
         private async Task InitializeAsync()
@@ -76,6 +78,15 @@ namespace MapDataServer.Services
                 await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLatLon(MinLat, MinLon);");
                 await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLonLat(MaxLon, MaxLat);");
                 await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLatLon(MaxLat, MaxLon);");
+            }
+            if (!tableTypes.Contains("MapHighways"))
+            {
+                await this.CreateTableAsync<MapHighway>();
+                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX SavedDate(SavedDate);");
+                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MinLonLat(MinLon, MinLat);");
+                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MinLatLon(MinLat, MinLon);");
+                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MaxLonLat(MaxLon, MaxLat);");
+                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MaxLatLon(MaxLat, MaxLon);");
             }
             if (!tableTypes.Contains("WayNodeLinks"))
             {

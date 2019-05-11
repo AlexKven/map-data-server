@@ -17,6 +17,7 @@ namespace MapDataServer.Services
         ITable<MapRelation> MapRelations { get; }
         ITable<MapRelationMember> MapRelationMembers { get; }
         ITable<MapWay> MapWays { get; }
+        ITable<MapHighway> MapHighways { get; }
         ITable<WayNodeLink> WayNodeLinks { get; }
         Task Initializer { get; }
 

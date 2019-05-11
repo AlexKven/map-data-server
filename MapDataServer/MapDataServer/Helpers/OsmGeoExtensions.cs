@@ -8,8 +8,10 @@ namespace MapDataServer.Helpers
 {
     public static class OsmGeoExtensions
     {
-        public static GeoType GetGeoType(this OsmSharp.OsmGeoType geo)
+        public static GeoType GetGeoType(this OsmSharp.OsmGeoType geo, bool highway = false)
         {
+            if (highway)
+                return GeoType.Highway;
             switch (geo)
             {
                 case OsmSharp.OsmGeoType.Node:

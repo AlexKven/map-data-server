@@ -15,6 +15,9 @@ namespace MapDataServer.Models
         [Column(Name = nameof(WayId)), PrimaryKey, NotNull, DataType(LinqToDB.DataType.Int64)]
         public long WayId { get; set; }
 
+        [Column(Name = nameof(Highway)), NotNull, DataType(LinqToDB.DataType.Boolean)]
+        public bool Highway { get; set; }
+
         [Column(Name = nameof(ItemIndex)), NotNull, DataType(LinqToDB.DataType.UInt16)]
         public ushort ItemIndex { get; set; }
     }
