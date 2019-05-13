@@ -1,10 +1,13 @@
-﻿using MapDataServer.Models;
+﻿using MapDataServer.Helpers;
+using MapDataServer.Models;
+using Priority_Queue;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using SQF = MapDataServer.Helpers.SqlableFunctions;
 
 namespace MapDataServer.Services
 {
@@ -23,13 +26,40 @@ namespace MapDataServer.Services
         private bool IsCloseToDestination(double testLon, double testLat, double destLon, double destLat) =>
             Math.Abs(testLon - destLon) <= MaxLonDist && Math.Abs(testLat - destLat) <= MaxLatDist;
 
-        private static double Distance(double lon1, double lat1, double lon2, double lat2) =>
-        Math.Sqrt((lon1 - lon2) * (lon1 - lon2) + (lat1 - lat2) * (lat1 - lat2));
-
-        public IAsyncEnumerable<MapNode> FindClosestNodesToPoint(double lon, double lat)
+        class ClosestNodesToPointEnumerator : LinqToDB.Async.IAsyncEnumerator<MapNode>
         {
-            return Database.MapNodes.OrderBy(
-                node => Distance(node.Longitude, lon, node.Latitude, lat)).ToAsyncEnumerable();
+            private RouteFinder RouteFinder { get; }
+            private List<MapNode> Nodes { get; } = new List<MapNode>();
+            private GeoPoint Point { get; }
+            private int CurrentIndex { get; set; } = -1;
+            private int CurrentLimit { get; set; } = 0;
+
+            public ClosestNodesToPointEnumerator(RouteFinder routeFinder, GeoPoint point)
+            {
+                RouteFinder = routeFinder;
+                Point = point;
+            }
+
+            public MapNode Current => Nodes[CurrentIndex];
+
+            public void Dispose() { }
+
+            public async Task<bool> MoveNext(CancellationToken cancellationToken)
+            {
+                if (++CurrentIndex >= Nodes.Count)
+                {
+                    CurrentLimit = CurrentLimit == 0 ? 8 : CurrentLimit * 2;
+                    double lon = Point.Longitude;
+                    double lat = Point.Latitude;
+                    var query = RouteFinder.Database.MapNodes.OrderBy(
+                        node => Math.Sqrt((node.Longitude - lon) * (node.Longitude - lon) + (node.Latitude - lat) * (node.Latitude - lat)))
+                        .Take(CurrentLimit);
+                    Nodes.Clear();
+                    Nodes.AddRange(await query.ToAsyncEnumerable().ToArray());
+                }
+
+                return (CurrentIndex < Nodes.Count);
+            }
         }
 
         class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode)>
@@ -173,29 +203,36 @@ namespace MapDataServer.Services
 
         public async Task Test()
         {
-            var nextStep = new StepEnumerator(Database, await Database.MapNodes.Where(n => n.Id == 267814842).ToAsyncEnumerable().First(), -122.3690414429, 47.2863121033);
+            var nextPoint = new ClosestNodesToPointEnumerator(this, new GeoPoint(-122.2473373413, 47.3770446777));
 
-            string list = "";
-            while (await nextStep.MoveNext())
+            while (await nextPoint.MoveNext(CancellationToken.None))
             {
-                var currentNode = nextStep.Current.Item2;
-                list += currentNode.Latitude.ToString() + "," + currentNode.Longitude.ToString() + "\n";
-                var nextNextStep = new StepEnumerator(Database, currentNode, -122.3690414429, 47.2863121033);
-                nextNextStep.ExcludedWays.Add(nextStep.Current.Item1);
-                while (await nextNextStep.MoveNext())
-                {
-                    var currentNextNode = nextNextStep.Current.Item2;
-                    list += currentNextNode.Latitude.ToString() + "," + currentNextNode.Longitude.ToString() + "\n";
-                    var nnnStep = new StepEnumerator(Database, currentNextNode, -122.3690414429, 47.2863121033);
-                    nnnStep.ExcludedWays.Add(nextNextStep.Current.Item1);
-                    nnnStep.ExcludedWays.Add(nextStep.Current.Item1);
-                    while (await nnnStep.MoveNext())
-                    {
-                        var currentNNNode = nnnStep.Current.Item2;
-                        list += currentNNNode.Latitude.ToString() + "," + currentNNNode.Longitude.ToString() + "\n";
-                    }
-                }
+                var node = nextPoint.Current;
             }
+
+            //var nextStep = new StepEnumerator(Database, await Database.MapNodes.Where(n => n.Id == 267814842).ToAsyncEnumerable().First(), -122.3690414429, 47.2863121033);
+
+            //string list = "";
+            //while (await nextStep.MoveNext())
+            //{
+            //    var currentNode = nextStep.Current.Item2;
+            //    list += currentNode.Latitude.ToString() + "," + currentNode.Longitude.ToString() + "\n";
+            //    var nextNextStep = new StepEnumerator(Database, currentNode, -122.3690414429, 47.2863121033);
+            //    nextNextStep.ExcludedWays.Add(nextStep.Current.Item1);
+            //    while (await nextNextStep.MoveNext())
+            //    {
+            //        var currentNextNode = nextNextStep.Current.Item2;
+            //        list += currentNextNode.Latitude.ToString() + "," + currentNextNode.Longitude.ToString() + "\n";
+            //        var nnnStep = new StepEnumerator(Database, currentNextNode, -122.3690414429, 47.2863121033);
+            //        nnnStep.ExcludedWays.Add(nextNextStep.Current.Item1);
+            //        nnnStep.ExcludedWays.Add(nextStep.Current.Item1);
+            //        while (await nnnStep.MoveNext())
+            //        {
+            //            var currentNNNode = nnnStep.Current.Item2;
+            //            list += currentNNNode.Latitude.ToString() + "," + currentNNNode.Longitude.ToString() + "\n";
+            //        }
+            //    }
+            //}
         }
 
 
