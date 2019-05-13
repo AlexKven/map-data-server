@@ -62,10 +62,10 @@ namespace MapDataServer.Services
 
         class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode)>
         {
-            IDatabase Database;
-            MapNode CurrentNode;
-            double DestLon;
-            double DestLat;
+            RouteFinder RouteFinder { get; }
+            MapNode CurrentNode { get; }
+            double DestLon { get; }
+            double DestLat { get; }
 
             public List<MapNode> ExcludedNodes { get; } = new List<MapNode>();
             public List<MapHighway> ExcludedWays { get; } = new List<MapHighway>();
@@ -75,9 +75,9 @@ namespace MapDataServer.Services
             int currentNOW = -1;
             List<MapNode> NodesOnWay = null;
 
-            public StepEnumerator(IDatabase database, MapNode currentNode, double destLon, double destLat)
+            public StepEnumerator(RouteFinder routeFinder, MapNode currentNode, double destLon, double destLat)
             {
-                Database = database;
+                RouteFinder = routeFinder;
                 CurrentNode = currentNode;
                 DestLon = destLon;
                 DestLat = destLat;
@@ -101,8 +101,8 @@ namespace MapDataServer.Services
 
             private async Task<List<MapHighway>> GetWaysCrossingNode(MapNode node, params MapHighway[] exclude)
             {
-                var query = from way in Database.MapHighways
-                            join link in Database.WayNodeLinks
+                var query = from way in RouteFinder.Database.MapHighways
+                            join link in RouteFinder.Database.WayNodeLinks
                             on new { NodeId = node.Id, WayId = way.Id }
                             equals new { NodeId = link.NodeId, WayId = link.WayId }
                             select way;
@@ -113,8 +113,8 @@ namespace MapDataServer.Services
 
             private async Task<List<MapNode>> GetNodesOnWay(MapHighway way, double destLon, double destLat, params MapNode[] exclude)
             {
-                var query = from node in Database.MapNodes
-                            join link in Database.WayNodeLinks
+                var query = from node in RouteFinder.Database.MapNodes
+                            join link in RouteFinder.Database.WayNodeLinks
                             on new { WayId = way.Id, NodeId = node.Id }
                             equals new { WayId = link.WayId, NodeId = link.NodeId }
                             orderby Math.Sqrt((node.Longitude - destLon) * (node.Longitude - destLon) + (node.Latitude - destLat)) ascending // Distance(node.Longitude, node.Latitude, destLon, destLat) ascending
@@ -147,7 +147,7 @@ namespace MapDataServer.Services
                     }
                     else
                     {
-                        found = (await (from link in Database.WayNodeLinks
+                        found = (await (from link in RouteFinder.Database.WayNodeLinks
                                         where link.NodeId == NodesOnWay[currentNOW].Id
                                         && link.WayId != WaysCrossingNode[currentWCN].Id
                                         select link).ToAsyncEnumerable().Count()) > 0;
@@ -156,6 +156,8 @@ namespace MapDataServer.Services
                 return true;
             }
         }
+
+        
 
         //public async Task<(MapHighway, MapNode)> FindNextStep(MapNode current, MapHighway way)
         //{
