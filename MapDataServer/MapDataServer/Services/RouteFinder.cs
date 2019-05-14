@@ -60,12 +60,11 @@ namespace MapDataServer.Services
             }
         }
 
-        class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode)>
+        class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode, double)>
         {
             RouteFinder RouteFinder { get; }
             MapNode CurrentNode { get; }
-            double DestLon { get; }
-            double DestLat { get; }
+            GeoPoint Destination { get; }
 
             public List<MapNode> ExcludedNodes { get; } = new List<MapNode>();
             public List<MapHighway> ExcludedWays { get; } = new List<MapHighway>();
@@ -73,25 +72,24 @@ namespace MapDataServer.Services
             int currentWCN = -1;
             List<MapHighway> WaysCrossingNode = null;
             int currentNOW = -1;
-            List<MapNode> NodesOnWay = null;
+            List<(MapNode, double)> NodesOnWay = null;
 
-            public StepEnumerator(RouteFinder routeFinder, MapNode currentNode, double destLon, double destLat)
+            public StepEnumerator(RouteFinder routeFinder, MapNode currentNode, GeoPoint destination)
             {
                 RouteFinder = routeFinder;
                 CurrentNode = currentNode;
-                DestLon = destLon;
-                DestLat = destLat;
+                Destination = destination;
                 ExcludedNodes.Add(currentNode);
             }
 
-            public (MapHighway, MapNode) Current
+            public (MapHighway, MapNode, double) Current
             {
                 get
                 {
                     if (WaysCrossingNode == null)
-                        return (null, null);
+                        return (null, null, 0);
 
-                    return (WaysCrossingNode[currentWCN], NodesOnWay[currentNOW]);
+                    return (WaysCrossingNode[currentWCN], NodesOnWay[currentNOW].Item1, NodesOnWay[currentNOW].Item2);
                 }
             }
 
@@ -111,16 +109,36 @@ namespace MapDataServer.Services
                 return result;
             }
 
-            private async Task<List<MapNode>> GetNodesOnWay(MapHighway way, double destLon, double destLat, params MapNode[] exclude)
+            private async Task<List<(MapNode, double)>> GetNodesOnWay(MapHighway way, GeoPoint destination, params MapNode[] exclude)
             {
                 var query = from node in RouteFinder.Database.MapNodes
                             join link in RouteFinder.Database.WayNodeLinks
                             on new { WayId = way.Id, NodeId = node.Id }
                             equals new { WayId = link.WayId, NodeId = link.NodeId }
-                            orderby Math.Sqrt((node.Longitude - destLon) * (node.Longitude - destLon) + (node.Latitude - destLat)) ascending // Distance(node.Longitude, node.Latitude, destLon, destLat) ascending
+                            orderby link.ItemIndex
                             select node;
-                var result = await query.ToAsyncEnumerable().ToList();
-                result.RemoveAll(node => exclude?.Contains(node) ?? false);
+                var result = await query.ToAsyncEnumerable().Select(node => (node, 0.0)).ToList();
+                var curIndex = result.FindIndex(n => n.Item1 == CurrentNode);
+                for (int i = 1; i < result.Count - curIndex; i++)
+                {
+                    result[curIndex + i] = (result[curIndex + i].Item1, result[curIndex + i - 1].Item2 + result[curIndex + i - 1].Item1.GetPoint().DistanceTo(result[curIndex + i].Item1.GetPoint()));
+                }
+                for (int i = 1; i < curIndex + 1; i++)
+                {
+                    result[curIndex - i] = (result[curIndex - i].Item1, result[curIndex - i + 1].Item2 + result[curIndex - i + 1].Item1.GetPoint().DistanceTo(result[curIndex - i].Item1.GetPoint()));
+                }
+                result.RemoveAll(node => exclude?.Contains(node.Item1) ?? false);
+                Func<(MapNode, double), (MapNode, double), int> compare = (nodeX, nodeY) =>
+                {
+                    var dX = nodeX.Item1.GetPoint().DistanceTo(destination);
+                    var dY = nodeX.Item1.GetPoint().DistanceTo(destination);
+                    if (dX < dY)
+                        return -1;
+                    else if (dX == dY)
+                        return 0;
+                    return 1;
+                };
+                result.Sort(Comparer<(MapNode, double)>.Create(new Comparison<(MapNode, double)>(compare)));
                 return result;
             }
 
@@ -138,7 +156,7 @@ namespace MapDataServer.Services
                     {
                         if (++currentWCN >= WaysCrossingNode.Count)
                             return false;
-                        NodesOnWay = await GetNodesOnWay(WaysCrossingNode[currentWCN], DestLon, DestLat, ExcludedNodes.ToArray());
+                        NodesOnWay = await GetNodesOnWay(WaysCrossingNode[currentWCN], Destination, ExcludedNodes.ToArray());
                     }
                     if (++currentNOW >= NodesOnWay.Count)
                     {
@@ -157,49 +175,109 @@ namespace MapDataServer.Services
             }
         }
 
-        
+        class AStarNode
+        {
+            public AStarNode(MapNode currentNode, MapNode destinationNode)
+            {
+                CurrentNode = currentNode;
+                DestinationNode = destinationNode;
+            }
 
-        //public async Task<(MapHighway, MapNode)> FindNextStep(MapNode current, MapHighway way)
-        //{
-        //    var nodesOnWay = from node in Database.MapNodes
-        //                     join link in Database.WayNodeLinks
-        //                     on new { nodeId = node.Id, wayId = way.Id }
-        //                     equals new { nodeId = link.NodeId, wayId = link.WayId }
-        //                     orderby link.ItemIndex
-        //                     select node;
-        //    var nodes = await nodesOnWay.ToAsyncEnumerable().ToList();
-        //    var index = nodes.IndexOf(current);
+            public AStarNode(AStarNode parent, double lastTravelDistance, MapNode currentNode, MapNode destinationNode)
+                : this(currentNode, destinationNode)
+            {
+                Parent = parent;
+                LastTravelDistance = lastTravelDistance;
+            }
 
-        //    int up = 0;
-        //    int down = 0;
-        //    MapNode upNode = null;
-        //    MapNode downNode = null;
-        //    MapHighway selectedWay = null;
-        //    while (up != -1 && down != -1)
-        //    {
-        //        if (up != -1)
-        //        {
-        //            up++;
-        //            if (index + up < nodes.Count)
-        //            {
-        //                upNode = nodes[index + up];
-        //            }
-        //            else
-        //                up = -1;
-        //        }
-        //        if (down != -1)
-        //        {
-        //            down++;
-        //            if (index - down >= 0)
-        //            {
-        //                downNode = nodes[index - down];
-        //            }
-        //            else
-        //                down = -1;
-        //        }
-        //    }
-        //    return;
-        //}
+            public AStarNode Parent { get; }
+            public MapNode CurrentNode { get; }
+            public double LastTravelDistance { get; }
+            public MapNode DestinationNode { get; }
+
+            public double F => G + H;
+            public double G => Parent == null ? 0 : Parent.G + LastTravelDistance;
+            public double H => CurrentNode.GetPoint().DistanceTo(DestinationNode.GetPoint());
+        }
+
+        class AStarEnumerator : IAsyncEnumerator<AStarNode>
+        {
+            public AStarEnumerator(MapNode start, MapNode end)
+            {
+                Start = start;
+                End = end;
+            }
+
+            private MapNode Start { get; }
+            private MapNode End { get; }
+
+            bool started = false;
+
+            List<AStarNode> Open { get;} = new List<AStarNode>();
+            List<AStarNode> Closed { get; } = new List<AStarNode>();
+
+            public AStarNode Current => throw new NotImplementedException();
+
+            public void Dispose()
+            {
+            }
+
+            public async Task<bool> MoveNext(CancellationToken cancellationToken)
+            {
+                if (!started)
+                {
+                    Open.Add(new AStarNode(Start, End));
+                    started = true;
+                    return true;
+                }
+                else
+                {
+
+                }
+            }
+        }
+
+        public async Task<(MapHighway, MapNode)> FindNextStep(MapNode current, MapHighway way)
+        {
+            var nodesOnWay = from node in Database.MapNodes
+                             join link in Database.WayNodeLinks
+                             on new { nodeId = node.Id, wayId = way.Id }
+                             equals new { nodeId = link.NodeId, wayId = link.WayId }
+                             orderby link.ItemIndex
+                             select node;
+            var nodes = await nodesOnWay.ToAsyncEnumerable().ToList();
+            var index = nodes.IndexOf(current);
+
+            int up = 0;
+            int down = 0;
+            MapNode upNode = null;
+            MapNode downNode = null;
+            MapHighway selectedWay = null;
+            while (up != -1 && down != -1)
+            {
+                if (up != -1)
+                {
+                    up++;
+                    if (index + up < nodes.Count)
+                    {
+                        upNode = nodes[index + up];
+                    }
+                    else
+                        up = -1;
+                }
+                if (down != -1)
+                {
+                    down++;
+                    if (index - down >= 0)
+                    {
+                        downNode = nodes[index - down];
+                    }
+                    else
+                        down = -1;
+                }
+            }
+            return;
+        }
 
         public async Task Test()
         {
