@@ -4,6 +4,14 @@
     <TargetFramework>netcoreapp2.1</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>TRACE;__SERVER__</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DefineConstants>TRACE;__SERVER__</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Folder Include="Config\" />
     <Folder Include="wwwroot\" />
@@ -16,5 +24,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Razor.Design" Version="2.1.2" PrivateAssets="All" />
     <PackageReference Include="OsmSharp" Version="6.1.0" />
   </ItemGroup>
+
+  <Import Project="..\ClientServerShared\ClientServerShared.projitems" Label="Shared" />
 
 </Project>

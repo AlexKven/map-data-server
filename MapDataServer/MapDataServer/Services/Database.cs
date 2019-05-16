@@ -39,8 +39,13 @@ namespace MapDataServer.Services
 
         public ITable<WayNodeLink> WayNodeLinks => GetTable<WayNodeLink>();
 
+        public ITable<Trip> Trips => GetTable<Trip>();
+
+        public ITable<TripPoint> TripPoints => GetTable<TripPoint>();
+
         private async Task InitializeAsync()
         {
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var sp = DataProvider.GetSchemaProvider();
             var tableTypes = sp.GetSchema(this).Tables.Select(table => table.TableName);
             if (!tableTypes.Contains("GeoTags"))
@@ -92,6 +97,18 @@ namespace MapDataServer.Services
             {
                 await this.CreateTableAsync<WayNodeLink>();
                 await this.ExecuteAsync("ALTER TABLE WayNodeLinks ADD INDEX WayId(WayId);");
+            }
+            if (!tableTypes.Contains("Trips"))
+            {
+                await this.CreateTableAsync<Trip>();
+            }
+            if (!tableTypes.Contains("TripPoints"))
+            {
+                await this.CreateTableAsync<TripPoint>();
+                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Longitude(Longitude);");
+                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Latitude(Latitude);");
+                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Time(Time);");
+                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX TripId(TripId);");
             }
         }
 

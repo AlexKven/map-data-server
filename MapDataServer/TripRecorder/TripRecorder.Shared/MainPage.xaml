@@ -5,9 +5,19 @@
     xmlns:local="using:TripRecorder"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:data="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
-		<TextBlock Text="Hello, world !" Margin="20" FontSize="30" />
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <TextBlock Text="{data:Binding CurrentMessage}" HorizontalAlignment="Center" FontSize="16"/>
+        <Button Name="ClickButton" Grid.Row="2" HorizontalAlignment="Center" Click="ClickButton_Click">Start new trip</Button>
     </Grid>
 </Page>
