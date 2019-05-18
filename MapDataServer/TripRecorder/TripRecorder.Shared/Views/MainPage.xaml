@@ -1,5 +1,5 @@
 ﻿<Page
-    x:Class="TripRecorder.MainPage"
+    x:Class="TripRecorder.Views.MainPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:TripRecorder"
@@ -16,8 +16,10 @@
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <TextBlock Text="{data:Binding CurrentMessage}" HorizontalAlignment="Center" FontSize="16"/>
-        <Button Name="ClickButton" Grid.Row="2" HorizontalAlignment="Center" Click="ClickButton_Click">Start new trip</Button>
+        <TextBlock Grid.ColumnSpan="2" Text="{data:Binding CurrentMessage}" HorizontalAlignment="Center" FontSize="16"/>
+        <Button Grid.Row="2" HorizontalAlignment="Center" Click="StartButton_Click">Start</Button>
+        <Button Grid.Row="2" Grid.Column="1" HorizontalAlignment="Center" Click="StopButton_Click">Stop</Button>
     </Grid>
 </Page>

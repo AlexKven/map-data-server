@@ -13,6 +13,9 @@ namespace TripRecorder.Droid
         )]
     public class MainActivity : Windows.UI.Xaml.ApplicationActivity
     {
+        public MainActivity()
+        {
+        }
     }
 }
 
