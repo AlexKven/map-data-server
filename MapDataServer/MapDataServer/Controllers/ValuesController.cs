@@ -7,6 +7,7 @@ using LinqToDB;
 using MapDataServer.Models;
 using MapDataServer.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using OsmSharp.Streams;
 using OsmSharp.Tags;
 
@@ -14,12 +15,13 @@ namespace MapDataServer.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ValuesController : ControllerBase
+    public class ValuesController : BaseController
     {
         private IDatabase Database { get; }
         private IHttpClientFactory HttpClientFactory { get; }
         private IMapDownloader MapDownloader { get; }
-        public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory, IMapDownloader mapDownloader)
+        public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory, IMapDownloader mapDownloader, IConfiguration configuration)
+            : base(configuration)
         {
             Database = database;
             HttpClientFactory = httpClientFactory;
@@ -30,7 +32,7 @@ namespace MapDataServer.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<string>>> Get()
         {
-            await Database.Initializer;
+            //await Database.Initializer;
             //await MapDownloader.DownloadMapRegions(-12245, 4728, 22, 15);
 
             //var wayFinder = new RouteFinder(Database);

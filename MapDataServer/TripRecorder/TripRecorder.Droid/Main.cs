@@ -35,7 +35,7 @@ namespace TripRecorder.Droid
             ImageLoaderConfiguration config = new ImageLoaderConfiguration
                 .Builder(Context)
                 .Build();
-
+            
             ImageLoader.Instance.Init(config);
 
             ImageSource.DefaultImageLoader = ImageLoader.Instance.LoadImageAsync;
