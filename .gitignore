@@ -18,3 +18,4 @@ MapDataServer/TripRecorder/TripRecorder\.iOS/bin/
 
 MapDataServer/TripRecorder/TripRecorder\.Wasm/obj/
 MapDataServer/TripRecorder/TripRecorder\.Wasm/bin/
+MapDataServer/TripRecorder/TripRecorder\.Droid/Assets/secrets\.json
