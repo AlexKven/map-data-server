@@ -166,7 +166,7 @@ namespace MapDataServer.Services
                     else
                     {
                         found = (await (from link in RouteFinder.Database.WayNodeLinks
-                                        where link.NodeId == NodesOnWay[currentNOW].Id
+                                        where link.NodeId == NodesOnWay[currentNOW].Item1.Id
                                         && link.WayId != WaysCrossingNode[currentWCN].Id
                                         select link).ToAsyncEnumerable().Count()) > 0;
                     }
@@ -198,15 +198,37 @@ namespace MapDataServer.Services
             public double F => G + H;
             public double G => Parent == null ? 0 : Parent.G + LastTravelDistance;
             public double H => CurrentNode.GetPoint().DistanceTo(DestinationNode.GetPoint());
+
+            public class AStarFComparer : IComparer<AStarNode>
+            {
+                public int Compare(AStarNode x, AStarNode y)
+                {
+                    if (x == null || y == null)
+                    {
+                        if (x == null)
+                        {
+                            return (y == null) ? 0 : 1;
+                        }
+                        if (y == null)
+                        {
+                            return (x == null) ? 0 : -1;
+                        }
+                    }
+                    return x.F.CompareTo(y.F);
+                }
+            }
         }
 
         class AStarEnumerator : IAsyncEnumerator<AStarNode>
         {
-            public AStarEnumerator(MapNode start, MapNode end)
+            public AStarEnumerator(RouteFinder routeFinder, MapNode start, MapNode end)
             {
+                RouteFinder = routeFinder;
                 Start = start;
                 End = end;
             }
+
+            private RouteFinder RouteFinder { get; }
 
             private MapNode Start { get; }
             private MapNode End { get; }
@@ -232,8 +254,29 @@ namespace MapDataServer.Services
                 }
                 else
                 {
-
+                    Open.Sort();
+                    if (Open.Count == 0)
+                        return false;
+                    var current = Open.First();
+                    Open.RemoveAt(0);
+                    if (current.CurrentNode.GetPoint() == End.GetPoint())
+                        return false;
+                    var successors = new List<AStarNode>();
+                    var nextEnumerator = new StepEnumerator(RouteFinder, current.CurrentNode, End.GetPoint());
+                    while (await nextEnumerator.MoveNext())
+                    {
+                        var successor = new AStarNode(current, nextEnumerator.Current.Item3, nextEnumerator.Current.Item2, End);
+                        if (!Open.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint())
+                            .Any(oNode => oNode.F < successor.F) &&
+                            !Closed.Where(cNode => cNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint())
+                            .Any(cNode => cNode.F < successor.F))
+                        {
+                            Open.Add(successor);
+                        }
+                    }
+                    Closed.Add(current);
                 }
+                return true;
             }
         }
 

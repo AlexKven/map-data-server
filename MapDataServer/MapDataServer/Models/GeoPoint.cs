@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace MapDataServer.Models
 {
-    public struct GeoPoint
+    public struct GeoPoint : IEquatable<GeoPoint>
     {
         public double Latitude { get; }
         public double Longitude { get; }
@@ -36,5 +36,30 @@ namespace MapDataServer.Models
             return d;
         }
 
+        public override bool Equals(object obj)
+        {
+            return obj is GeoPoint point && Equals(point);
+        }
+
+        public bool Equals(GeoPoint other)
+        {
+            return Latitude == other.Latitude &&
+                   Longitude == other.Longitude;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Latitude, Longitude);
+        }
+
+        public static bool operator ==(GeoPoint left, GeoPoint right)
+        {
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(GeoPoint left, GeoPoint right)
+        {
+            return !(left == right);
+        }
     }
 }
