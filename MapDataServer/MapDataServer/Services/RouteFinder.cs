@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,9 +17,33 @@ namespace MapDataServer.Services
 
         private IDatabase Database { get; }
 
+        private IQueryable<MapNode> MapNodes { get; set; }
+        private IQueryable<MapWay> MapWays { get; set; }
+        private IQueryable<MapHighway> MapHighways { get; set; }
+        private IQueryable<WayNodeLink> WayNodeLinks { get; set; }
+
         public RouteFinder(IDatabase database)
         {
             Database = database;
+            MapNodes = Database.MapNodes;
+            MapWays = database.MapWays;
+            MapHighways = Database.MapHighways;
+            WayNodeLinks = database.WayNodeLinks;
+        }
+
+        private async Task RestrictRegion(GeoPoint swCorner, GeoPoint neCorner)
+        {
+            var nodes = await Database.MapNodes.WithinBoundingBox(swCorner, neCorner).ToAsyncEnumerable().ToDictionary(node => node.Id);
+            var links = await Database.WayNodeLinks.Where(link => nodes.ContainsKey(link.NodeId)).ToAsyncEnumerable().ToList();
+            var wayIds = links.Where(link => link.Highway == false).Select(link => link.WayId).Distinct().ToArray();
+            var highwayIds = links.Where(link => link.Highway == true).Select(link => link.WayId).Distinct().ToArray();
+            var ways = await (from way in Database.MapWays where wayIds.Contains(way.Id) select way).ToAsyncEnumerable().ToList();
+            var highways = await (from highway in Database.MapHighways where highwayIds.Contains(highway.Id) select highway).ToAsyncEnumerable().ToList();
+
+            MapNodes = nodes.Values.AsQueryable();
+            MapWays = ways.AsQueryable();
+            MapHighways = highways.AsQueryable();
+            WayNodeLinks = links.AsQueryable();
         }
 
         private bool IsCloseToDestination(double testLon, double testLat, double destLon, double destLat) =>
@@ -49,7 +74,7 @@ namespace MapDataServer.Services
                     CurrentLimit = CurrentLimit == 0 ? 8 : CurrentLimit * 2;
                     double lon = Point.Longitude;
                     double lat = Point.Latitude;
-                    var query = RouteFinder.Database.MapNodes.OrderBy(
+                    var query = RouteFinder.MapNodes.OrderBy(
                         node => Math.Sqrt((node.Longitude - lon) * (node.Longitude - lon) + (node.Latitude - lat) * (node.Latitude - lat)))
                         .Take(CurrentLimit);
                     Nodes.Clear();
@@ -99,8 +124,8 @@ namespace MapDataServer.Services
 
             private async Task<List<MapHighway>> GetWaysCrossingNode(MapNode node, params MapHighway[] exclude)
             {
-                var query = from way in RouteFinder.Database.MapHighways
-                            join link in RouteFinder.Database.WayNodeLinks
+                var query = from way in RouteFinder.MapHighways
+                            join link in RouteFinder.WayNodeLinks
                             on new { NodeId = node.Id, WayId = way.Id }
                             equals new { NodeId = link.NodeId, WayId = link.WayId }
                             select way;
@@ -111,14 +136,14 @@ namespace MapDataServer.Services
 
             private async Task<List<(MapNode, double)>> GetNodesOnWay(MapHighway way, GeoPoint destination, params MapNode[] exclude)
             {
-                var query = from node in RouteFinder.Database.MapNodes
-                            join link in RouteFinder.Database.WayNodeLinks
+                var query = from node in RouteFinder.MapNodes
+                            join link in RouteFinder.WayNodeLinks
                             on new { WayId = way.Id, NodeId = node.Id }
                             equals new { WayId = link.WayId, NodeId = link.NodeId }
                             orderby link.ItemIndex
                             select node;
                 var result = await query.ToAsyncEnumerable().Select(node => (node, 0.0)).ToList();
-                var curIndex = result.FindIndex(n => n.Item1 == CurrentNode);
+                var curIndex = result.FindIndex(n => n.Item1.Equals(CurrentNode));
                 for (int i = 1; i < result.Count - curIndex; i++)
                 {
                     result[curIndex + i] = (result[curIndex + i].Item1, result[curIndex + i - 1].Item2 + result[curIndex + i - 1].Item1.GetPoint().DistanceTo(result[curIndex + i].Item1.GetPoint()));
@@ -165,7 +190,7 @@ namespace MapDataServer.Services
                     }
                     else
                     {
-                        found = (await (from link in RouteFinder.Database.WayNodeLinks
+                        found = (await (from link in RouteFinder.WayNodeLinks
                                         where link.NodeId == NodesOnWay[currentNOW].Item1.Id
                                         && link.WayId != WaysCrossingNode[currentWCN].Id
                                         select link).ToAsyncEnumerable().Count()) > 0;
@@ -188,6 +213,30 @@ namespace MapDataServer.Services
             {
                 Parent = parent;
                 LastTravelDistance = lastTravelDistance;
+            }
+
+            public IEnumerable<MapNode> Traverse()
+            {
+                List<MapNode> result = new List<MapNode>();
+                var cur = this;
+                while (cur != null)
+                {
+                    result.Add(cur.CurrentNode);
+                    cur = cur.Parent;
+                }
+                result.Reverse();
+                return result;
+            }
+
+            public string GetNodePositions()
+            {
+                StringBuilder result = new StringBuilder();
+                foreach (var node in Traverse())
+                {
+                    result.AppendLine($"{node.Latitude}, {node.Longitude}");
+                }
+
+                return result.ToString();
             }
 
             public AStarNode Parent { get; }
@@ -254,22 +303,28 @@ namespace MapDataServer.Services
                 }
                 else
                 {
-                    Open.Sort();
+                    Open.Sort(new AStarNode.AStarFComparer());
+                    var positions = Open.Select(asn => asn.GetNodePositions()).ToList();
                     if (Open.Count == 0)
                         return false;
                     var current = Open.First();
                     Open.RemoveAt(0);
                     if (current.CurrentNode.GetPoint() == End.GetPoint())
+                    {
+                        var list = current.GetNodePositions();
+
                         return false;
+                    }
                     var successors = new List<AStarNode>();
                     var nextEnumerator = new StepEnumerator(RouteFinder, current.CurrentNode, End.GetPoint());
                     while (await nextEnumerator.MoveNext())
                     {
                         var successor = new AStarNode(current, nextEnumerator.Current.Item3, nextEnumerator.Current.Item2, End);
+                        var openSame = Open.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint()).ToList();
+                        var closedSame = Closed.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint()).ToList();
                         if (!Open.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint())
-                            .Any(oNode => oNode.F < successor.F) &&
-                            !Closed.Where(cNode => cNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint())
-                            .Any(cNode => cNode.F < successor.F))
+                            .Any(oNode => oNode.F <= successor.F) &&
+                            !Closed.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint()).Any())
                         {
                             Open.Add(successor);
                         }
@@ -319,17 +374,25 @@ namespace MapDataServer.Services
                         down = -1;
                 }
             }
-            return;
+            throw new NotImplementedException();
         }
 
         public async Task Test()
         {
-            var nextPoint = new ClosestNodesToPointEnumerator(this, new GeoPoint(-122.2473373413, 47.3770446777));
+            await RestrictRegion(new GeoPoint(-122.375, 47.298), new GeoPoint(-122.356, 47.306));
 
-            while (await nextPoint.MoveNext(CancellationToken.None))
-            {
-                var node = nextPoint.Current;
-            }
+            var start = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.3743112409, 47.2992754696), 1).ToAsyncEnumerable().ToList();
+            var end = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.35793546, 47.3046521336), 1).ToAsyncEnumerable().ToList();
+
+            var astar = new AStarEnumerator(this, start[0], end[0]);
+            while (await astar.MoveNext()) { }
+
+            //var nextPoint = new ClosestNodesToPointEnumerator(this, new GeoPoint(-122.2473373413, 47.3770446777));
+
+            //while (await nextPoint.MoveNext(CancellationToken.None))
+            //{
+            //    var node = nextPoint.Current;
+            //}
 
             //var nextStep = new StepEnumerator(Database, await Database.MapNodes.Where(n => n.Id == 267814842).ToAsyncEnumerable().First(), -122.3690414429, 47.2863121033);
 
@@ -365,7 +428,7 @@ namespace MapDataServer.Services
 
             while (true)
             {
-
+                
             }
 
             throw new NotImplementedException();
