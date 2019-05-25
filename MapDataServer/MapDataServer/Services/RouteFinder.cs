@@ -284,8 +284,54 @@ namespace MapDataServer.Services
 
             bool started = false;
 
-            List<AStarNode> Open { get;} = new List<AStarNode>();
+            SortedList<double, AStarNode[]> Open { get;} = new SortedList<double, AStarNode[]>();
             List<AStarNode> Closed { get; } = new List<AStarNode>();
+
+            private void AddToOpen(AStarNode node)
+            {
+                if (!Open.TryAdd(node.F, new AStarNode[] { node }))
+                {
+                    var cur = Open[node.F];
+                    var next = new AStarNode[cur.Length + 1];
+                    for (int i = 0; i < cur.Length; i++)
+                    {
+                        next[i] = cur[i];
+                    }
+                    next[cur.Length] = node;
+                    Open[node.F] = next;
+                }
+            }
+
+            private AStarNode PopFromOpen()
+            {
+                var result = Open.First().Value.First();
+                if (Open.First().Value.Length == 1)
+                    Open.RemoveAt(0);
+                else
+                {
+                    var cur = Open.First().Value;
+                    var next = new AStarNode[cur.Length - 1];
+                    for (int i = 1; i < cur.Length; i++)
+                    {
+                        next[i - 1] = cur[i];
+                    }
+                    Open[Open.First().Key] = next;
+                }
+                return result;
+            }
+
+            bool OpenContainsEqualOrBetterPath(AStarNode node)
+            {
+                var index = Open.Keys.BinarySearch(node.F);
+                while (Open.Count > index && Open.Keys[index] <= node.F)
+                    index++;
+                for (int i = 0; i < index; i++)
+                {
+                    if (Open.Values[i].Any(oNode => oNode.CurrentNode.GetPoint() == node.CurrentNode.GetPoint()))
+                        return true;
+                }
+                return false;
+            }
 
             public AStarNode Current => throw new NotImplementedException();
 
@@ -293,26 +339,26 @@ namespace MapDataServer.Services
             {
             }
 
+            DateTime startTime;
             public async Task<bool> MoveNext(CancellationToken cancellationToken)
             {
                 if (!started)
                 {
-                    Open.Add(new AStarNode(Start, End));
+                    AddToOpen(new AStarNode(Start, End));
+                    startTime = DateTime.Now;
                     started = true;
                     return true;
                 }
                 else
                 {
-                    Open.Sort(new AStarNode.AStarFComparer());
-                    var positions = Open.Select(asn => asn.GetNodePositions()).ToList();
+                    var currentPath = Open.First().Value.First().GetNodePositions();
                     if (Open.Count == 0)
                         return false;
-                    var current = Open.First();
-                    Open.RemoveAt(0);
+                    var current = PopFromOpen();
                     if (current.CurrentNode.GetPoint() == End.GetPoint())
                     {
                         var list = current.GetNodePositions();
-
+                        var elapsedTime = startTime - DateTime.Now;
                         return false;
                     }
                     var successors = new List<AStarNode>();
@@ -320,13 +366,10 @@ namespace MapDataServer.Services
                     while (await nextEnumerator.MoveNext())
                     {
                         var successor = new AStarNode(current, nextEnumerator.Current.Item3, nextEnumerator.Current.Item2, End);
-                        var openSame = Open.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint()).ToList();
-                        var closedSame = Closed.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint()).ToList();
-                        if (!Open.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint())
-                            .Any(oNode => oNode.F <= successor.F) &&
-                            !Closed.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint()).Any())
+                        var closedSame = Closed.Where(oNode => oNode.CurrentNode.GetPoint() == successor.CurrentNode.GetPoint());
+                        if (!closedSame.Any() && !OpenContainsEqualOrBetterPath(successor))
                         {
-                            Open.Add(successor);
+                            AddToOpen(successor);
                         }
                     }
                     Closed.Add(current);
@@ -379,10 +422,10 @@ namespace MapDataServer.Services
 
         public async Task Test()
         {
-            await RestrictRegion(new GeoPoint(-122.375, 47.298), new GeoPoint(-122.356, 47.306));
+            await RestrictRegion(new GeoPoint(-122.39, 47.29), new GeoPoint(-122.34, 47.31));
 
-            var start = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.3743112409, 47.2992754696), 1).ToAsyncEnumerable().ToList();
-            var end = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.35793546, 47.3046521336), 1).ToAsyncEnumerable().ToList();
+            var start = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.377429, 47.302616), 1).ToAsyncEnumerable().ToList();
+            var end = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.356744, 47.30603), 1).ToAsyncEnumerable().ToList();
 
             var astar = new AStarEnumerator(this, start[0], end[0]);
             while (await astar.MoveNext()) { }
