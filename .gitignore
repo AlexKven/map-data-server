@@ -4,3 +4,18 @@ MapDataServer/MapDataServer/obj/
 MapDataServer/MapDataServer/bin/
 
 MapDataServer/MapDataServer/secrets\.json
+
+*.ttf
+
+MapDataServer/TripRecorder/TripRecorder\.Droid/obj/
+MapDataServer/TripRecorder/TripRecorder\.Droid/bin/
+
+MapDataServer/TripRecorder/TripRecorder\.UWP/obj/
+MapDataServer/TripRecorder/TripRecorder\.UWP/bin/
+
+MapDataServer/TripRecorder/TripRecorder\.iOS/obj/
+MapDataServer/TripRecorder/TripRecorder\.iOS/bin/
+
+MapDataServer/TripRecorder/TripRecorder\.Wasm/obj/
+MapDataServer/TripRecorder/TripRecorder\.Wasm/bin/
+MapDataServer/TripRecorder/TripRecorder\.Droid/Assets/secrets\.json
