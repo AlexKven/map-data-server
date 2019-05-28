@@ -36,6 +36,13 @@ namespace MapDataServer.Models
             return d;
         }
 
+        public double DistanceTo(GeoPoint? other)
+        {
+            if (other == null)
+                return 0;
+            return DistanceTo(other.Value);
+        }
+
         public override bool Equals(object obj)
         {
             return obj is GeoPoint point && Equals(point);

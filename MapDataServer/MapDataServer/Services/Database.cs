@@ -191,5 +191,17 @@ namespace MapDataServer.Services
             var enumerator = values.GetEnumerator();
             while (!await BulkInserting(enumerator, orReplace, tableAttribute, propertyInfos)) ;
         }
+
+        public async Task<FullTrip> GetFullTrip(long tripId)
+        {
+            var trip = await Trips.Where(t => t.Id == tripId).ToAsyncEnumerable().FirstOrDefault();
+            if (trip == null)
+                return null;
+            var points = await TripPoints.Where(tp => tp.TripId == tripId).OrderBy(tp => tp.Time).ToAsyncEnumerable().ToList();
+
+            var result = new FullTrip() { TripId = tripId, VehicleType = trip.VehicleType, HovStatus = trip.HovStatus, BusRoute = trip.BusRoute };
+            result.Points.AddRange(points);
+            return result;
+        }
     }
 }

@@ -16,5 +16,9 @@ namespace MapDataServer.Helpers
         {
             return new GeoPoint(node.Longitude, node.Latitude);
         }
+        public static GeoPoint GetPoint(this TripPoint node)
+        {
+            return new GeoPoint(node.Longitude, node.Latitude);
+        }
     }
 }

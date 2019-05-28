@@ -32,15 +32,18 @@ namespace MapDataServer.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<string>>> Get()
         {
-            //await Database.Initializer;
-            //await MapDownloader.DownloadMapRegions(-12245, 4728, 22, 15);
+            await Database.Initializer;
+            //await MapDownloader.DownloadMapRegions(-12223, 4737, 22, 30);
+
+            var trip1 = await Database.GetFullTrip(8042057989057450465);
+            var trip2 = await Database.GetFullTrip(4819942918563353813);
 
             //var wayFinder = new RouteFinder(Database);
+            //await wayFinder.Test();
+
             //var node = await Database.MapNodes.Where(n => n.Id == 267814842).FirstAsync();
             //var way = await Database.MapWays.Where(w => w.Id == 12193812).FirstAsync();
             //var next = await wayFinder.FindNextStep(node, way);
-
-            //await wayFinder.Test();
 
             //await Database.Initializer;
             //var httpClient = HttpClientFactory.CreateClient();

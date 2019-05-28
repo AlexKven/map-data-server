@@ -152,6 +152,17 @@ namespace MapDataServer.Services
                 {
                     result[curIndex - i] = (result[curIndex - i].Item1, result[curIndex - i + 1].Item2 + result[curIndex - i + 1].Item1.GetPoint().DistanceTo(result[curIndex - i].Item1.GetPoint()));
                 }
+                if (!way.OneWay.IsFalseNoBlankOrNull())
+                {
+                    if (way.OneWay == "-1")
+                    {
+                        result.RemoveRange(curIndex - 1, result.Count - curIndex);
+                    }
+                    else
+                    {
+                        result.RemoveRange(0, curIndex);
+                    }
+                }
                 result.RemoveAll(node => exclude?.Contains(node.Item1) ?? false);
                 Func<(MapNode, double), (MapNode, double), int> compare = (nodeX, nodeY) =>
                 {
@@ -422,10 +433,10 @@ namespace MapDataServer.Services
 
         public async Task Test()
         {
-            await RestrictRegion(new GeoPoint(-122.39, 47.29), new GeoPoint(-122.34, 47.31));
+            await RestrictRegion(new GeoPoint(-122.30, 47.56), new GeoPoint(-122.14, 47.64));
 
-            var start = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.377429, 47.302616), 1).ToAsyncEnumerable().ToList();
-            var end = await Database.MapNodes.ClosestToPoint(new GeoPoint(-122.356744, 47.30603), 1).ToAsyncEnumerable().ToList();
+            var start = await MapNodes.ClosestToPoint(new GeoPoint(-122.1430948723, 47.631465695), 1).ToAsyncEnumerable().ToList();
+            var end = await MapNodes.ClosestToPoint(new GeoPoint(-122.2962537325, 47.5651499114), 1).ToAsyncEnumerable().ToList();
 
             var astar = new AStarEnumerator(this, start[0], end[0]);
             while (await astar.MoveNext()) { }
