@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <SharedGUID>544fd1f7-28fb-436e-9510-317944b3d935</SharedGUID>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration">
+    <Import_RootNamespace>ClientServerShared</Import_RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Models\HovStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\Trip.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\TripPoint.cs" />
+  </ItemGroup>
+</Project>
