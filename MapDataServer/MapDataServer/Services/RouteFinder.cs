@@ -433,6 +433,19 @@ namespace MapDataServer.Services
 
         public async Task Test()
         {
+
+            var trip1 = await Database.GetFullTrip(8042057989057450465);
+            var trip2 = await Database.GetFullTrip(4819942918563353813);
+
+            foreach (var step in trip1)
+            {
+                var distance = step.CurrentPoint.GetPoint().DistanceTo(step.PreviousPoint?.GetPoint());
+                var timeBetween = step.CurrentPoint.Time - step.PreviousPoint?.Time;
+                step.Drop();
+            }
+
+
+            return;
             await RestrictRegion(new GeoPoint(-122.30, 47.56), new GeoPoint(-122.14, 47.64));
 
             var start = await MapNodes.ClosestToPoint(new GeoPoint(-122.1430948723, 47.631465695), 1).ToAsyncEnumerable().ToList();
