@@ -68,5 +68,15 @@ namespace MapDataServer.Helpers
         {
             return list.BinarySearch(value, comparer.Compare);
         }
+
+        public static async Task<bool> AnyAsync<T>(this IEnumerable<T> enumerable, Func<T, Task<bool>> predicate)
+        {
+            foreach (var item in enumerable)
+            {
+                if (await predicate(item))
+                    return true;
+            }
+            return false;
+        }
     }
 }
