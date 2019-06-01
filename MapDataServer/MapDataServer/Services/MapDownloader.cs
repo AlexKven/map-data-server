@@ -139,7 +139,7 @@ namespace MapDataServer.Services
 
         public async Task DownloadMapRegions(int minLon, int minLat, int lengthLon, int lengthLat)
         {
-            await Database.Initializer;
+            await Database.Initialize();
             for (int i = 0; i < lengthLon; i++)
             {
                 for (int j = 0; j < lengthLat; j++)

@@ -21,8 +21,7 @@ namespace MapDataServer.Services
         ITable<WayNodeLink> WayNodeLinks { get; }
         ITable<Trip> Trips { get; }
         ITable<TripPoint> TripPoints { get; }
-        Task Initializer { get; }
+        Task Initialize();
         Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false);
-        Task<FullTrip> GetFullTrip(long tripId);
     }
 }

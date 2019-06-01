@@ -26,7 +26,7 @@ namespace MapDataServer.Controllers
         [HttpPost("start")]
         public async Task<ActionResult<string>> StartTrip([FromBody] Trip trip)
         {
-            await Database.Initializer;
+            await Database.Initialize();
             if (!IsAuthorized())
                 return Unauthorized();
 
@@ -41,7 +41,7 @@ namespace MapDataServer.Controllers
         [HttpPost("point")]
         public async Task<ActionResult<string>> PostPoint([FromBody] TripPoint point)
         {
-            await Database.Initializer;
+            await Database.Initialize();
             if (!IsAuthorized())
                 return Unauthorized();
 

@@ -18,8 +18,9 @@ namespace MapDataServer.Services
         public Database(IConfiguration config, IDataProvider dataProvider)
             : base(dataProvider, config.GetConnectionString("MySQL"))
         {
-            Initializer = InitializeAsync();
         }
+
+        private bool Initialized { get; set; } = false;
 
         public Task Initializer { get; }
 
@@ -43,8 +44,10 @@ namespace MapDataServer.Services
 
         public ITable<TripPoint> TripPoints => GetTable<TripPoint>();
 
-        private async Task InitializeAsync()
+        public async Task Initialize()
         {
+            if (Initialized)
+                return;
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             var sp = DataProvider.GetSchemaProvider();
             var tableTypes = sp.GetSchema(this).Tables.Select(table => table.TableName);
@@ -110,6 +113,7 @@ namespace MapDataServer.Services
                 await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Time(Time);");
                 await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX TripId(TripId);");
             }
+            Initialized = true;
         }
 
         // From https://stackoverflow.com/questions/10235507/determine-which-sql-data-types-require-value-to-be-quoted
@@ -190,18 +194,6 @@ namespace MapDataServer.Services
 
             var enumerator = values.GetEnumerator();
             while (!await BulkInserting(enumerator, orReplace, tableAttribute, propertyInfos)) ;
-        }
-
-        public async Task<FullTrip> GetFullTrip(long tripId)
-        {
-            var trip = await Trips.Where(t => t.Id == tripId).ToAsyncEnumerable().FirstOrDefault();
-            if (trip == null)
-                return null;
-            var points = await TripPoints.Where(tp => tp.TripId == tripId).OrderBy(tp => tp.Time).ToAsyncEnumerable().ToList();
-
-            var result = new FullTrip() { TripId = tripId, VehicleType = trip.VehicleType, HovStatus = trip.HovStatus, BusRoute = trip.BusRoute };
-            result.Points.AddRange(points);
-            return result;
         }
     }
 }
