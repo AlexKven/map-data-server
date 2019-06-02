@@ -25,24 +25,34 @@ namespace MapDataServer.Services
         public Task Initializer { get; }
 
         public ITable<GeoTag> GeoTags => GetTable<GeoTag>();
+        IQueryable<GeoTag> IMapDataSchema.GeoTags => GeoTags;
 
         public ITable<MapRegion> MapRegions => GetTable<MapRegion>();
+        IQueryable<MapRegion> IMapDataSchema.MapRegions => MapRegions;
 
         public ITable<MapNode> MapNodes => GetTable<MapNode>();
+        IQueryable<MapNode> IMapDataSchema.MapNodes => MapNodes;
 
         public ITable<MapRelation> MapRelations => GetTable<MapRelation>();
+        IQueryable<MapRelation> IMapDataSchema.MapRelations => MapRelations;
 
         public ITable<MapRelationMember> MapRelationMembers => GetTable<MapRelationMember>();
+        IQueryable<MapRelationMember> IMapDataSchema.MapRelationMembers => MapRelationMembers;
 
         public ITable<MapWay> MapWays => GetTable<MapWay>();
+        IQueryable<MapWay> IMapDataSchema.MapWays => MapWays;
 
         public ITable<MapHighway> MapHighways => GetTable<MapHighway>();
+        IQueryable<MapHighway> IMapDataSchema.MapHighways => MapHighways;
 
         public ITable<WayNodeLink> WayNodeLinks => GetTable<WayNodeLink>();
+        IQueryable<WayNodeLink> IMapDataSchema.WayNodeLinks => WayNodeLinks;
 
         public ITable<Trip> Trips => GetTable<Trip>();
+        IQueryable<Trip> IMapDataSchema.Trips => Trips;
 
         public ITable<TripPoint> TripPoints => GetTable<TripPoint>();
+        IQueryable<TripPoint> IMapDataSchema.TripPoints => TripPoints;
 
         public async Task Initialize()
         {

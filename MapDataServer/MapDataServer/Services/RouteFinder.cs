@@ -17,92 +17,16 @@ namespace MapDataServer.Services
 
         private IDatabase Database { get; }
 
-        private IQueryable<MapNode> MapNodes { get; set; }
-        private IQueryable<MapWay> MapWays { get; set; }
-        private IQueryable<MapHighway> MapHighways { get; set; }
-        private IQueryable<WayNodeLink> WayNodeLinks { get; set; }
+        private MemoryDatabase MemoryDatabase { get; }
 
         public RouteFinder(IDatabase database)
         {
             Database = database;
-            MapNodes = Database.MapNodes;
-            MapWays = database.MapWays;
-            MapHighways = Database.MapHighways;
-            WayNodeLinks = database.WayNodeLinks;
-        }
-
-        private async Task RestrictRegion(GeoPoint swCorner, GeoPoint neCorner)
-        {
-            var nodes = await Database.MapNodes.WithinBoundingBox(swCorner, neCorner).ToAsyncEnumerable().ToDictionary(node => node.Id);
-            var links = await Database.WayNodeLinks.Where(link => nodes.ContainsKey(link.NodeId)).ToAsyncEnumerable().ToList();
-            var wayIds = links.Where(link => link.Highway == false).Select(link => link.WayId).Distinct().ToArray();
-            var highwayIds = links.Where(link => link.Highway == true).Select(link => link.WayId).Distinct().ToArray();
-            var ways = await (from way in Database.MapWays where wayIds.Contains(way.Id) select way).ToAsyncEnumerable().ToList();
-            var highways = await (from highway in Database.MapHighways where highwayIds.Contains(highway.Id) select highway).ToAsyncEnumerable().ToList();
-
-            MapNodes = nodes.Values.AsQueryable();
-            MapWays = ways.AsQueryable();
-            MapHighways = highways.AsQueryable();
-            WayNodeLinks = links.AsQueryable();
+            MemoryDatabase = new MemoryDatabase(Database);
         }
 
         private bool IsCloseToDestination(double testLon, double testLat, double destLon, double destLat) =>
             Math.Abs(testLon - destLon) <= MaxLonDist && Math.Abs(testLat - destLat) <= MaxLatDist;
-
-        public async Task<MapNode[]> GetClosestNodes(GeoPoint point, int count, CancellationToken cancellationToken)
-        {
-            var enumerator = new ClosestNodesToPointEnumerator(this, point);
-            MapNode[] result = new MapNode[count];
-            int index = 0;
-            while (await enumerator.MoveNext(cancellationToken) && index < count)
-            {
-                result[index] = enumerator.Current;
-                index++;
-            }
-
-            return result;
-        }
-
-        class ClosestNodesToPointEnumerator : LinqToDB.Async.IAsyncEnumerator<MapNode>
-        {
-            private RouteFinder RouteFinder { get; }
-            private List<MapNode> Nodes { get; } = new List<MapNode>();
-            private GeoPoint Point { get; }
-            private int CurrentIndex { get; set; } = -1;
-            private int CurrentLimit { get; set; } = 0;
-
-            public ClosestNodesToPointEnumerator(RouteFinder routeFinder, GeoPoint point)
-            {
-                RouteFinder = routeFinder;
-                Point = point;
-            }
-
-            public MapNode Current => Nodes[CurrentIndex];
-
-            public void Dispose() { }
-
-            public async Task<bool> MoveNext(CancellationToken cancellationToken)
-            {
-                if (++CurrentIndex >= Nodes.Count)
-                {
-                    CurrentLimit = CurrentLimit == 0 ? 8 : CurrentLimit * 2;
-                    double lon = Point.Longitude;
-                    double lat = Point.Latitude;
-
-                    var query = (from node in RouteFinder.MapNodes
-                                 join link in RouteFinder.WayNodeLinks on new { id = node.Id, highway = true } equals new { id = link.NodeId, highway = link.Highway }
-                                 orderby Math.Sqrt((node.Longitude - lon) * (node.Longitude - lon) + (node.Latitude - lat) * (node.Latitude - lat)) ascending
-                                 select node).Take(CurrentLimit);
-                    //var query = RouteFinder.MapNodes.OrderBy(
-                    //    node => Math.Sqrt((node.Longitude - lon) * (node.Longitude - lon) + (node.Latitude - lat) * (node.Latitude - lat)))
-                    //    .Take(CurrentLimit);
-                    Nodes.Clear();
-                    Nodes.AddRange(await query.ToAsyncEnumerable().ToArray());
-                }
-
-                return (CurrentIndex < Nodes.Count);
-            }
-        }
 
         class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode, double)>
         {
@@ -143,8 +67,8 @@ namespace MapDataServer.Services
 
             private async Task<List<MapHighway>> GetWaysCrossingNode(MapNode node, params MapHighway[] exclude)
             {
-                var query = from way in RouteFinder.MapHighways
-                            join link in RouteFinder.WayNodeLinks
+                var query = from way in RouteFinder.MemoryDatabase.MapHighways
+                            join link in RouteFinder.MemoryDatabase.WayNodeLinks
                             on new { NodeId = node.Id, WayId = way.Id }
                             equals new { NodeId = link.NodeId, WayId = link.WayId }
                             select way;
@@ -155,8 +79,8 @@ namespace MapDataServer.Services
 
             private async Task<List<(MapNode, double)>> GetNodesOnWay(MapHighway way, GeoPoint destination, params MapNode[] exclude)
             {
-                var query = from node in RouteFinder.MapNodes
-                            join link in RouteFinder.WayNodeLinks
+                var query = from node in RouteFinder.MemoryDatabase.MapNodes
+                            join link in RouteFinder.MemoryDatabase.WayNodeLinks
                             on new { WayId = way.Id, NodeId = node.Id }
                             equals new { WayId = link.WayId, NodeId = link.NodeId }
                             orderby link.ItemIndex
@@ -220,7 +144,7 @@ namespace MapDataServer.Services
                     }
                     else
                     {
-                        found = (await (from link in RouteFinder.WayNodeLinks
+                        found = (await (from link in RouteFinder.MemoryDatabase.WayNodeLinks
                                         where link.NodeId == NodesOnWay[currentNOW].Item1.Id
                                         && link.WayId != WaysCrossingNode[currentWCN].Id
                                         select link).ToAsyncEnumerable().Count()) > 0;
@@ -476,10 +400,10 @@ namespace MapDataServer.Services
 
 
             return;
-            await RestrictRegion(new GeoPoint(-122.30, 47.56), new GeoPoint(-122.14, 47.64));
+            await MemoryDatabase.SetFromRegion(Database, new GeoPoint(-122.30, 47.56), new GeoPoint(-122.14, 47.64));
 
-            var start = await MapNodes.ClosestToPoint(new GeoPoint(-122.1430948723, 47.631465695), 1).ToAsyncEnumerable().ToList();
-            var end = await MapNodes.ClosestToPoint(new GeoPoint(-122.2962537325, 47.5651499114), 1).ToAsyncEnumerable().ToList();
+            var start = await MemoryDatabase.MapNodes.ClosestToPoint(new GeoPoint(-122.1430948723, 47.631465695), 1).ToAsyncEnumerable().ToList();
+            var end = await MemoryDatabase.MapNodes.ClosestToPoint(new GeoPoint(-122.2962537325, 47.5651499114), 1).ToAsyncEnumerable().ToList();
 
             var astar = new AStarEnumerator(this, start[0], end[0]);
             while (await astar.MoveNext()) { }
@@ -557,9 +481,9 @@ namespace MapDataServer.Services
                     continue;
                 }
 
-                closestNodesCurrent = await GetClosestNodes(step.CurrentPoint.GetPoint(), 8, CancellationToken.None);
+                closestNodesCurrent = await MemoryDatabase.GetClosestNodes(step.CurrentPoint.GetPoint(), 8);
                 //if (selectedNodePrevious == null)
-                    closestNodesPrevious = await GetClosestNodes(step.PreviousPoint.GetPoint(), 8, CancellationToken.None);
+                    closestNodesPrevious = await MemoryDatabase.GetClosestNodes(step.PreviousPoint.GetPoint(), 8);
 
                 pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[0]));
 

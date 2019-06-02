@@ -8,92 +8,62 @@ using LinqToDB;
 using LinqToDB.Linq;
 using LinqToDB.Mapping;
 using LinqToDB.SqlProvider;
+using MapDataServer.Helpers;
 using MapDataServer.Models;
 
 namespace MapDataServer.Services
 {
-    public class MemoryDatabase : IDatabase
+    public class MemoryDatabase : IMapDataSchema
     {
-        public ITable<MapRegion> MapRegions => throw new NotImplementedException();
+        public MemoryDatabase() { }
 
-        public ITable<MapNode> MapNodes => throw new NotImplementedException();
-
-        public ITable<GeoTag> GeoTags => throw new NotImplementedException();
-
-        public ITable<MapRelation> MapRelations => throw new NotImplementedException();
-
-        public ITable<MapRelationMember> MapRelationMembers => throw new NotImplementedException();
-
-        public ITable<MapWay> MapWays => throw new NotImplementedException();
-
-        public ITable<MapHighway> MapHighways => throw new NotImplementedException();
-
-        public ITable<WayNodeLink> WayNodeLinks => throw new NotImplementedException();
-
-        public ITable<Trip> Trips => throw new NotImplementedException();
-
-        public ITable<TripPoint> TripPoints => throw new NotImplementedException();
-
-        public string ContextID => throw new NotImplementedException();
-
-        public Func<ISqlBuilder> CreateSqlProvider => throw new NotImplementedException();
-
-        public Func<ISqlOptimizer> GetSqlOptimizer => throw new NotImplementedException();
-
-        public SqlProviderFlags SqlProviderFlags => throw new NotImplementedException();
-
-        public Type DataReaderType => throw new NotImplementedException();
-
-        public MappingSchema MappingSchema => throw new NotImplementedException();
-
-        public bool InlineParameters { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-        public List<string> QueryHints => throw new NotImplementedException();
-
-        public List<string> NextQueryHints => throw new NotImplementedException();
-
-        public bool CloseAfterUse { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-        public event EventHandler OnClosing;
-
-        public Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false)
+        public MemoryDatabase(IMapDataSchema forward)
         {
-            throw new NotImplementedException();
+            MapRegions = forward.MapRegions;
+            MapNodes = forward.MapNodes;
+            GeoTags = forward.GeoTags;
+            MapRelations = forward.MapRelations;
+            MapRelationMembers = forward.MapRelationMembers;
+            MapWays = forward.MapWays;
+            MapHighways = forward.MapHighways;
+            WayNodeLinks = forward.WayNodeLinks;
+            Trips = forward.Trips;
+            TripPoints = forward.TripPoints;
         }
 
-        public IDataContext Clone(bool forNestedQuery)
+        public async Task SetFromRegion(IMapDataSchema database, GeoPoint swCorner, GeoPoint neCorner)
         {
-            throw new NotImplementedException();
+            var nodes = await database.MapNodes.WithinBoundingBox(swCorner, neCorner).ToAsyncEnumerable().ToDictionary(node => node.Id);
+            var links = await database.WayNodeLinks.Where(link => nodes.ContainsKey(link.NodeId)).ToAsyncEnumerable().ToList();
+            var wayIds = links.Where(link => link.Highway == false).Select(link => link.WayId).Distinct().ToArray();
+            var highwayIds = links.Where(link => link.Highway == true).Select(link => link.WayId).Distinct().ToArray();
+            var ways = await (from way in database.MapWays where wayIds.Contains(way.Id) select way).ToAsyncEnumerable().ToList();
+            var highways = await (from highway in database.MapHighways where highwayIds.Contains(highway.Id) select highway).ToAsyncEnumerable().ToList();
+
+            MapNodes = nodes.Values.AsQueryable();
+            MapWays = ways.AsQueryable();
+            MapHighways = highways.AsQueryable();
+            WayNodeLinks = links.AsQueryable();
         }
 
-        public void Close()
-        {
-            throw new NotImplementedException();
-        }
+        public IQueryable<MapRegion> MapRegions { get; protected set; }
 
-        public void Dispose()
-        {
-            throw new NotImplementedException();
-        }
+        public IQueryable<MapNode> MapNodes { get; protected set; }
 
-        public IQueryRunner GetQueryRunner(Query query, int queryNumber, Expression expression, object[] parameters)
-        {
-            throw new NotImplementedException();
-        }
+        public IQueryable<GeoTag> GeoTags { get; protected set; }
 
-        public Expression GetReaderExpression(MappingSchema mappingSchema, IDataReader reader, int idx, Expression readerExpression, Type toType)
-        {
-            throw new NotImplementedException();
-        }
+        public IQueryable<MapRelation> MapRelations { get; protected set; }
 
-        public Task Initialize()
-        {
-            throw new NotImplementedException();
-        }
+        public IQueryable<MapRelationMember> MapRelationMembers { get; protected set; }
 
-        public bool? IsDBNullAllowed(IDataReader reader, int idx)
-        {
-            throw new NotImplementedException();
-        }
+        public IQueryable<MapWay> MapWays { get; protected set; }
+
+        public IQueryable<MapHighway> MapHighways { get; protected set; }
+
+        public IQueryable<WayNodeLink> WayNodeLinks { get; protected set; }
+
+        public IQueryable<Trip> Trips { get; protected set; }
+
+        public IQueryable<TripPoint> TripPoints { get; protected set; }
     }
 }

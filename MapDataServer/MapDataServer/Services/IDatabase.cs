@@ -9,18 +9,18 @@ using System.Threading.Tasks;
 
 namespace MapDataServer.Services
 {
-    public interface IDatabase : IDataContext
+    public interface IDatabase : IDataContext, IMapDataSchema
     {
-        ITable<MapRegion> MapRegions { get; }
-        ITable<MapNode> MapNodes { get; }
-        ITable<GeoTag> GeoTags { get; }
-        ITable<MapRelation> MapRelations { get; }
-        ITable<MapRelationMember> MapRelationMembers { get; }
-        ITable<MapWay> MapWays { get; }
-        ITable<MapHighway> MapHighways { get; }
-        ITable<WayNodeLink> WayNodeLinks { get; }
-        ITable<Trip> Trips { get; }
-        ITable<TripPoint> TripPoints { get; }
+        new ITable<MapRegion> MapRegions { get; }
+        new ITable<MapNode> MapNodes { get; }
+        new ITable<GeoTag> GeoTags { get; }
+        new ITable<MapRelation> MapRelations { get; }
+        new ITable<MapRelationMember> MapRelationMembers { get; }
+        new ITable<MapWay> MapWays { get; }
+        new ITable<MapHighway> MapHighways { get; }
+        new ITable<WayNodeLink> WayNodeLinks { get; }
+        new ITable<Trip> Trips { get; }
+        new ITable<TripPoint> TripPoints { get; }
         Task Initialize();
         Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false);
     }

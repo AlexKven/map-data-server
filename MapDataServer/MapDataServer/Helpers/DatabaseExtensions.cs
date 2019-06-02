@@ -19,7 +19,7 @@ namespace MapDataServer.Helpers
                 (node.Latitude - point.Latitude) * (node.Latitude - point.Latitude))).Take(count);
 
 
-        public static async Task<MapNode[]> GetClosestNodes(this IDatabase database, GeoPoint point, int count)
+        public static async Task<MapNode[]> GetClosestNodes(this IMapDataSchema database, GeoPoint point, int count)
         {
             var lon = point.Longitude;
             var lat = point.Latitude;
@@ -30,7 +30,7 @@ namespace MapDataServer.Helpers
             return await query.ToArrayAsync();
         }
 
-        public static async Task<FullTrip> GetFullTrip(this IDatabase database, long tripId)
+        public static async Task<FullTrip> GetFullTrip(this IMapDataSchema database, long tripId)
         {
             var trip = await database.Trips.Where(t => t.Id == tripId).ToAsyncEnumerable().FirstOrDefault();
             if (trip == null)
