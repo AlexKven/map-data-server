@@ -37,8 +37,8 @@ namespace MapDataServer.Models
 
         public static bool operator ==(GeoBase left, GeoBase right)
         {
-            if (left == null || right == null)
-                return left == null && right == null;
+            if (ReferenceEquals(left, null) || ReferenceEquals(right, null))
+                return ReferenceEquals(left, null) == ReferenceEquals(right, null);
             return left.Equals(right);
         }
 

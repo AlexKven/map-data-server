@@ -12,8 +12,7 @@ namespace MapDataServer.Services
 {
     public class RouteFinder : IRouteFinder
     {
-        private double MaxLonDist { get; } = 0.0027;
-        private double MaxLatDist { get; } = 0.0023;
+        private double MaxDist { get; } = 0.0025;
 
         private IDatabase Database { get; }
 
@@ -24,9 +23,6 @@ namespace MapDataServer.Services
             Database = database;
             MemoryDatabase = new MemoryDatabase(Database);
         }
-
-        private bool IsCloseToDestination(double testLon, double testLat, double destLon, double destLat) =>
-            Math.Abs(testLon - destLon) <= MaxLonDist && Math.Abs(testLat - destLat) <= MaxLatDist;
 
         class StepEnumerator : IAsyncEnumerator<(MapHighway, MapNode, double)>
         {
@@ -193,6 +189,14 @@ namespace MapDataServer.Services
                 return result.ToString();
             }
 
+            public AStarNode GetFirstParent()
+            {
+                var parent = this;
+                while (parent.Parent != null)
+                    parent = parent.Parent;
+                return parent;
+            }
+
             public AStarNode Parent { get; }
             public MapNode CurrentNode { get; }
             public double LastTravelDistance { get; }
@@ -343,8 +347,8 @@ namespace MapDataServer.Services
 
         public async Task<(MapHighway, MapNode)> FindNextStep(MapNode current, MapHighway way)
         {
-            var nodesOnWay = from node in Database.MapNodes
-                             join link in Database.WayNodeLinks
+            var nodesOnWay = from node in MemoryDatabase.MapNodes
+                             join link in MemoryDatabase.WayNodeLinks
                              on new { nodeId = node.Id, wayId = way.Id }
                              equals new { nodeId = link.NodeId, wayId = link.WayId }
                              orderby link.ItemIndex
@@ -396,8 +400,13 @@ namespace MapDataServer.Services
             //    step.Drop();
             //}
 
-            await FindRoute(trip1);
+            StringBuilder coords = new StringBuilder();
+            var path = await FindRoute(trip1);
 
+            foreach (var node in path)
+            {
+                coords.AppendLine($"{node.Latitude}, {node.Longitude}");
+            }
 
             return;
             await MemoryDatabase.SetFromRegion(Database, new GeoPoint(-122.30, 47.56), new GeoPoint(-122.14, 47.64));
@@ -443,25 +452,25 @@ namespace MapDataServer.Services
 
         //public IAsyncEnumerable<(MapHighway way, MapNode next)> FindNextSteps(double destLon, double destLat, IEnumerable<MapNode> previousNodes)
 
-        public async Task<IEnumerable<WaySegment>> FindRoute(FullTrip trip)
+        public async Task<List<MapNode>> FindRoute(FullTrip trip)
         {
-
+            List<MapNode> pathResult = new List<MapNode>();
 
             List<IEnumerator<MapNode>> points = new List<IEnumerator<MapNode>>();
 
-            var pathFinders = new List<AStarEnumerator>();
             MapNode[] closestNodesPrevious = null;
             MapNode[] closestNodesCurrent = null;
 
+            bool AreNodesClose(MapNode start, MapNode end) => start.GetPoint().DistanceTo(end.GetPoint()) <= MaxDist;
 
-            async Task<bool> AnyComplete()
+            async Task<AStarNode> FirstCompletedPathOrDefault(List<AStarEnumerator> pathFinders)
             {
                 for (int i = 0; i < pathFinders.Count; i++)
                 {
                     if (!(await pathFinders[i].MoveNext()))
                     {
                         if (pathFinders[i].Complete)
-                            return true;
+                            return pathFinders[i].Current;
                         else
                         {
                             pathFinders.RemoveAt(i);
@@ -469,10 +478,142 @@ namespace MapDataServer.Services
                         }
                     }
                 }
-                return false;
+                return null;
             }
 
-            MapNode selectedNodePrevious = null;
+            async Task<AStarNode> FindPathMultiple(MapNode[] startPoints, MapNode[] endPoints)
+            {
+                int attempt = 0;
+                var pathFinders = new List<AStarEnumerator>();
+                pathFinders.Add(new AStarEnumerator(this, startPoints[0], endPoints[0]));
+                AStarNode result;
+
+                while ((result = await FirstCompletedPathOrDefault(pathFinders)) == null && attempt < 150 && pathFinders.Count > 0)
+                {
+                    attempt++;
+                    if (attempt == 5)
+                    {
+                        if (AreNodesClose(startPoints[1], endPoints[0]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[1], endPoints[0]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[0], endPoints[1]));
+                        }
+                    }
+                    if (attempt == 10)
+                    {
+                        if (AreNodesClose(startPoints[1], endPoints[1]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[1], endPoints[1]));
+                        if (AreNodesClose(startPoints[2], endPoints[0]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[2], endPoints[0]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[0], endPoints[2]));
+                        }
+                    }
+                    if (attempt == 15)
+                    {
+                        if (AreNodesClose(startPoints[3], endPoints[0]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[3], endPoints[0]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[0], endPoints[3]));
+                        }
+                        if (AreNodesClose(startPoints[1], endPoints[2]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[2], endPoints[1]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[1], endPoints[2]));
+                        }
+                    }
+                    if (attempt == 20)
+                    {
+                        if (AreNodesClose(startPoints[4], endPoints[0]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[4], endPoints[0]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[0], endPoints[4]));
+                        }
+                        if (AreNodesClose(startPoints[1], endPoints[3]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[3], endPoints[1]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[1], endPoints[3]));
+                        }
+                        if (AreNodesClose(startPoints[2], endPoints[2]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[2], endPoints[2]));
+                    }
+                    if (attempt == 25)
+                    {
+                        if (AreNodesClose(startPoints[1], endPoints[4]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[4], endPoints[1]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[1], endPoints[4]));
+                        }
+                        if (AreNodesClose(startPoints[2], endPoints[3]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[3], endPoints[2]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[2], endPoints[3]));
+                        }
+                    }
+                    if (attempt == 30)
+                    {
+                        if (AreNodesClose(startPoints[2], endPoints[4]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[4], endPoints[2]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[2], endPoints[4]));
+                        }
+                        if (AreNodesClose(startPoints[3], endPoints[3]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[3], endPoints[3]));
+                    }
+                    if (attempt == 35)
+                    {
+                        if (AreNodesClose(startPoints[3], endPoints[4]))
+                        {
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[4], endPoints[3]));
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[3], endPoints[4]));
+                        }
+                    }
+                    if (attempt == 40)
+                    {
+                        if (AreNodesClose(startPoints[4], endPoints[4]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoints[4], endPoints[4]));
+                    }
+                }
+
+                return result;
+            }
+
+            async Task<AStarNode> FindPathSingle(MapNode startPoint, MapNode[] endPoints)
+            {
+                var pathFinders = new List<AStarEnumerator>();
+                int attempt = 0;
+                pathFinders.Add(new AStarEnumerator(this, startPoint, endPoints[0]));
+                AStarNode result;
+
+                while ((result = await FirstCompletedPathOrDefault(pathFinders)) == null && attempt < 40 && pathFinders.Count > 0)
+                {
+                    attempt++;
+                    if (attempt == 5)
+                    {
+                        if (AreNodesClose(startPoint, endPoints[1]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoint, endPoints[1]));
+                    }
+                    if (attempt == 10)
+                    {
+                        if (AreNodesClose(startPoint, endPoints[2]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoint, endPoints[2]));
+                    }
+                    if (attempt == 15)
+                    {
+                        if (AreNodesClose(startPoint, endPoints[3]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoint, endPoints[3]));
+                    }
+                    if (attempt == 20)
+                    {
+                        if (AreNodesClose(startPoint, endPoints[4]))
+                            pathFinders.Add(new AStarEnumerator(this, startPoint, endPoints[4]));
+                    }
+                }
+
+                return result;
+            }
+
+            MapNode previousSelectedNode = null;
 
             foreach (var step in trip)
             {
@@ -480,77 +621,59 @@ namespace MapDataServer.Services
                 {
                     continue;
                 }
-
-                closestNodesCurrent = await MemoryDatabase.GetClosestNodes(step.CurrentPoint.GetPoint(), 8);
-                //if (selectedNodePrevious == null)
-                    closestNodesPrevious = await MemoryDatabase.GetClosestNodes(step.PreviousPoint.GetPoint(), 8);
-
-                pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[0]));
-
-                int attempt = 0;
-                while (!(await AnyComplete()))
+                if (step.CurrentPoint.GetPoint().DistanceTo(step.PreviousPoint.GetPoint()) < MaxDist)
                 {
-                    attempt++;
-                    if (attempt == 5)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[1]));
-                    }
-                    if (attempt == 10)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[1]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[2], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[2]));
-                    }
-                    if (attempt == 15)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[3], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[3]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[2], closestNodesCurrent[1]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[2]));
-                    }
-                    if (attempt == 20)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[4], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[4]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[3], closestNodesCurrent[1]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[3]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[2], closestNodesCurrent[2]));
-                    }
-                    if (attempt == 25)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[5], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[5]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[4], closestNodesCurrent[1]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[4]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[3], closestNodesCurrent[2]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[2], closestNodesCurrent[3]));
-                    }
-                    if (attempt == 30)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[6], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[6]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[5], closestNodesCurrent[1]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[5]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[4], closestNodesCurrent[2]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[2], closestNodesCurrent[4]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[3], closestNodesCurrent[3]));
-                    }
-                    if (attempt == 35)
-                    {
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[7], closestNodesCurrent[0]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[0], closestNodesCurrent[7]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[6], closestNodesCurrent[1]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[1], closestNodesCurrent[6]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[5], closestNodesCurrent[2]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[2], closestNodesCurrent[5]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[4], closestNodesCurrent[3]));
-                        pathFinders.Add(new AStarEnumerator(this, closestNodesPrevious[3], closestNodesCurrent[4]));
-                    }
+                    step.Drop();
+                    continue;
                 }
+
+                closestNodesCurrent = await Database.GetClosestNodes(step.CurrentPoint.GetPoint(), 5);
+                closestNodesPrevious = await Database.GetClosestNodes(step.PreviousPoint.GetPoint(), 5);
+
+                AStarNode path = null;
+
+                double minLat;
+                double minLon;
+                double maxLat;
+                double maxLon;
+
+                if (previousSelectedNode != null)
+                {
+                    minLat = Math.Min(previousSelectedNode.Latitude, closestNodesCurrent[0].Latitude) - 2 * MaxDist;
+                    minLon = Math.Min(previousSelectedNode.Longitude, closestNodesCurrent[0].Longitude) - 2 * MaxDist;
+                    maxLat = Math.Max(previousSelectedNode.Latitude, closestNodesCurrent[0].Latitude) + 2 * MaxDist;
+                    maxLon = Math.Max(previousSelectedNode.Longitude, closestNodesCurrent[0].Longitude) + 2 * MaxDist;
+                }
+                else
+                {
+                    minLat = Math.Min(closestNodesPrevious[0].Latitude, closestNodesCurrent[0].Latitude) - 2 * MaxDist;
+                    minLon = Math.Min(closestNodesPrevious[0].Longitude, closestNodesCurrent[0].Longitude) - 2 * MaxDist;
+                    maxLat = Math.Max(closestNodesPrevious[0].Latitude, closestNodesCurrent[0].Latitude) + 2 * MaxDist;
+                    maxLon = Math.Max(closestNodesPrevious[0].Longitude, closestNodesCurrent[0].Longitude) + 2 * MaxDist;
+                }
+
+                await MemoryDatabase.SetFromRegion(Database, new GeoPoint(minLon, minLat), new GeoPoint(maxLon, maxLat));
+
+                if (previousSelectedNode != null)
+                {
+                    path = await FindPathSingle(previousSelectedNode, closestNodesCurrent);
+                }
+                if (path == null)
+                {
+                    path = await FindPathMultiple(closestNodesPrevious, closestNodesCurrent);
+                }
+
+                if (path != null)
+                {
+                    if (previousSelectedNode == null)
+                        pathResult.Add(path.GetFirstParent().CurrentNode);
+                    pathResult.Add(path.CurrentNode);
+                }
+
+                previousSelectedNode = path?.CurrentNode;
             }
 
-            return Enumerable.Empty<WaySegment>();
+            return pathResult;
         }
     }
 }
