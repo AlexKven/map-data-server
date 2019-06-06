@@ -140,7 +140,8 @@ namespace MapDataServer.Services
                     }
                     else
                     {
-                        found = (await (from link in RouteFinder.MemoryDatabase.WayNodeLinks
+                        found = NodesOnWay[currentNOW].Item1.GetPoint() == Destination ||
+                            (await (from link in RouteFinder.MemoryDatabase.WayNodeLinks
                                         where link.NodeId == NodesOnWay[currentNOW].Item1.Id
                                         && link.WayId != WaysCrossingNode[currentWCN].Id
                                         select link).ToAsyncEnumerable().Count()) > 0;
@@ -387,6 +388,90 @@ namespace MapDataServer.Services
             throw new NotImplementedException();
         }
 
+        public class PathMatcher
+        {
+            private RouteFinder RouteFinder { get; }
+            private int NodesPerPoint { get; }
+            private int PointCount { get; }
+
+            public PathMatcher(RouteFinder routeFinder, int nodesPerPoint, int pointCount)
+            {
+                RouteFinder = routeFinder;
+                NodesPerPoint = nodesPerPoint;
+                PointCount = pointCount;
+            }
+
+            private List<MapNode[]> ClosestNodes { get; } = new List<MapNode[]>();
+            private List<GeoPoint> CurrentPoints { get; } = new List<GeoPoint>();
+
+            private async Task SetMemoryRegion()
+            {
+                double minLat = 0;
+                double minLon = 0;
+                double maxLat = 0;
+                double maxLon = 0;
+
+                bool first = true;
+                foreach (var point in CurrentPoints)
+                {
+                    if (first)
+                    {
+                        minLat = maxLat = point.Latitude;
+                        minLon = maxLon = point.Longitude;
+                        first = false;
+                    }
+                    else
+                    {
+                        if (point.Latitude < minLat)
+                            minLat = point.Latitude;
+                        if (point.Latitude > maxLat)
+                            maxLat = point.Latitude;
+                        if (point.Longitude < minLon)
+                            minLat = point.Latitude;
+                        if (point.Longitude > maxLon)
+                            maxLat = point.Latitude;
+                    }
+                }
+
+                minLat -= 2 * RouteFinder.MaxDist;
+                maxLat += 2 * RouteFinder.MaxDist;
+                minLon -= 2 * RouteFinder.MaxDist;
+                maxLon += 2 * RouteFinder.MaxDist;
+                await RouteFinder.MemoryDatabase.SetFromRegion(RouteFinder.Database, new GeoPoint(minLon, minLat), new GeoPoint(maxLon, maxLat));
+            }
+
+            private async Task<MapNode[]> GetClosestNodes(GeoPoint point) =>
+                (await RouteFinder.MemoryDatabase.GetClosestNodes(point, NodesPerPoint))
+                .Where(node => node.GetPoint().DistanceTo(point) < RouteFinder.MaxDist)
+                .ToArray();
+
+            public async Task<bool> PushPoint(GeoPoint point)
+            {
+                CurrentPoints.Add(point);
+                var oldPoint = CurrentPoints[0];
+                CurrentPoints.RemoveAt(0);
+                await SetMemoryRegion();
+                var closest = await GetClosestNodes(point);
+                foreach (var arr in ClosestNodes)
+                {
+                    foreach (var node in arr)
+                    {
+                        if (closest.Contains(node))
+                        {
+                            // Points seem to be clustering, and this point is likely to not contribue any valuable information & should be dropped
+                            CurrentPoints.Remove(point);
+                            CurrentPoints.Insert(0, oldPoint);
+                            return false;
+                        }
+                    }
+                }
+                ClosestNodes.Add(closest);
+                ClosestNodes.RemoveAt(0);
+
+                return true;
+            }
+        }
+
         public async Task Test()
         {
 
@@ -627,9 +712,6 @@ namespace MapDataServer.Services
                     continue;
                 }
 
-                closestNodesCurrent = await Database.GetClosestNodes(step.CurrentPoint.GetPoint(), 5);
-                closestNodesPrevious = await Database.GetClosestNodes(step.PreviousPoint.GetPoint(), 5);
-
                 AStarNode path = null;
 
                 double minLat;
@@ -637,22 +719,27 @@ namespace MapDataServer.Services
                 double maxLat;
                 double maxLon;
 
+                GeoPoint boundingPoint0 = step.CurrentPoint.GetPoint();
+                GeoPoint boundingPoint1;
+
                 if (previousSelectedNode != null)
-                {
-                    minLat = Math.Min(previousSelectedNode.Latitude, closestNodesCurrent[0].Latitude) - 2 * MaxDist;
-                    minLon = Math.Min(previousSelectedNode.Longitude, closestNodesCurrent[0].Longitude) - 2 * MaxDist;
-                    maxLat = Math.Max(previousSelectedNode.Latitude, closestNodesCurrent[0].Latitude) + 2 * MaxDist;
-                    maxLon = Math.Max(previousSelectedNode.Longitude, closestNodesCurrent[0].Longitude) + 2 * MaxDist;
-                }
+                    boundingPoint1 = previousSelectedNode.GetPoint();
+                else if (step.PreviousPoint != null)
+                    boundingPoint1 = step.PreviousPoint.GetPoint();
+                else if (closestNodesPrevious != null)
+                    boundingPoint1 = closestNodesPrevious[0].GetPoint();
                 else
-                {
-                    minLat = Math.Min(closestNodesPrevious[0].Latitude, closestNodesCurrent[0].Latitude) - 2 * MaxDist;
-                    minLon = Math.Min(closestNodesPrevious[0].Longitude, closestNodesCurrent[0].Longitude) - 2 * MaxDist;
-                    maxLat = Math.Max(closestNodesPrevious[0].Latitude, closestNodesCurrent[0].Latitude) + 2 * MaxDist;
-                    maxLon = Math.Max(closestNodesPrevious[0].Longitude, closestNodesCurrent[0].Longitude) + 2 * MaxDist;
-                }
+                    boundingPoint1 = boundingPoint0;
+
+                minLat = Math.Min(boundingPoint0.Latitude, boundingPoint1.Latitude) - 2 * MaxDist;
+                minLon = Math.Min(boundingPoint0.Longitude, boundingPoint1.Longitude) - 2 * MaxDist;
+                maxLat = Math.Max(boundingPoint0.Latitude, boundingPoint1.Latitude) + 2 * MaxDist;
+                maxLon = Math.Max(boundingPoint0.Longitude, boundingPoint1.Longitude) + 2 * MaxDist;
 
                 await MemoryDatabase.SetFromRegion(Database, new GeoPoint(minLon, minLat), new GeoPoint(maxLon, maxLat));
+
+                closestNodesCurrent = await MemoryDatabase.GetClosestNodes(step.CurrentPoint.GetPoint(), 5);
+                closestNodesPrevious = null;
 
                 if (previousSelectedNode != null)
                 {
@@ -660,6 +747,8 @@ namespace MapDataServer.Services
                 }
                 if (path == null)
                 {
+                    if (closestNodesPrevious == null)
+                        closestNodesPrevious = await MemoryDatabase.GetClosestNodes(step.PreviousPoint.GetPoint(), 5);
                     path = await FindPathMultiple(closestNodesPrevious, closestNodesCurrent);
                 }
 

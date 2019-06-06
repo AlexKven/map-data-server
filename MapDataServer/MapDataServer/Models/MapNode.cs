@@ -36,5 +36,7 @@ namespace MapDataServer.Models
 
         [Column(Name = nameof(Region)), DataType(LinqToDB.DataType.Int64), NotNull]
         public long Region { get; set; }
+
+        public string PointFormatted => $"{Latitude}, {Longitude}";
     }
 }
