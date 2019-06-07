@@ -427,6 +427,10 @@ namespace MapDataServer.Services
             private List<MapNode[]> ClosestNodes { get; } = new List<MapNode[]>();
             private List<GeoPoint> CurrentPoints { get; } = new List<GeoPoint>();
 
+            private Dictionary<(int, int, int), AStarEnumerator> TripPairFinders { get; } = new Dictionary<(int, int, int), AStarEnumerator>();
+
+            public List<int[]> CurrentPaths { get; } = new List<int[]>();
+
             private async Task SetMemoryRegion()
             {
                 double minLat = 0;
@@ -465,14 +469,71 @@ namespace MapDataServer.Services
 
             private async Task<MapNode[]> GetClosestNodes(GeoPoint point) =>
                 (await RouteFinder.MemoryDatabase.GetClosestNodes(point, NodesPerPoint))
-                .Where(node => node.GetPoint().DistanceTo(point) < RouteFinder.MaxDist)
+                //.Where(node => node.GetPoint().DistanceTo(point) < RouteFinder.MaxDist)
                 .ToArray();
+
+            async Task<bool?> AttemptAndCheckPath(int[] path)
+            {
+                for (int i = 0; i < path.Length - 1; i++)
+                {
+                    var key = (i, path[i], path[i + 1]);
+                    var finder = TripPairFinders[key];
+                    if (finder == null)
+                        return null;
+                    var continues = await finder.MoveNext();
+                    if (continues)
+                        return false;
+                    if (!finder.Complete)
+                    {
+                        TripPairFinders[key] = null;
+                        return null;
+                    }
+                }
+                return true;
+            }
+
+            async Task<int[]> FirstCompletedPathOrDefault()
+            {
+                for (int i = 0; i < CurrentPaths.Count; i++)
+                {
+                    var status = await AttemptAndCheckPath(CurrentPaths[i]);
+                    switch (status)
+                    {
+                        case true:
+                            return CurrentPaths[i];
+                        case null:
+                            CurrentPaths.RemoveAt(i);
+                            i--;
+                            break;
+                    }
+                }
+                return null;
+            }
+
+            async void AddFindersForPath(int[] path)
+            {
+                CurrentPaths.Add(path);
+                for (int i = 0; i < path.Length - 1; i++)
+                {
+                    var key = (i, path[i], path[i + 1]);
+                    if (!TripPairFinders.ContainsKey(key))
+                    {
+                        var startPoint = ClosestNodes[i][path[i]];
+                        var endPoint = ClosestNodes[i + 1][path[i + 1]];
+                        TripPairFinders.Add(key, new AStarEnumerator(RouteFinder, startPoint, endPoint));
+                    }
+                }
+            }
 
             public async Task<bool> PushPoint(GeoPoint point)
             {
                 CurrentPoints.Add(point);
-                var oldPoint = CurrentPoints[0];
-                CurrentPoints.RemoveAt(0);
+                GeoPoint? oldPoint = null;
+                if (CurrentPoints.Count > PointCount)
+                {
+                    oldPoint = CurrentPoints[0];
+                    CurrentPoints.RemoveAt(0);
+                }
                 await SetMemoryRegion();
                 var closest = await GetClosestNodes(point);
                 foreach (var arr in ClosestNodes)
@@ -483,15 +544,53 @@ namespace MapDataServer.Services
                         {
                             // Points seem to be clustering, and this point is likely to not contribue any valuable information & should be dropped
                             CurrentPoints.Remove(point);
-                            CurrentPoints.Insert(0, oldPoint);
+                            if (oldPoint != null)
+                                CurrentPoints.Insert(0, oldPoint.Value);
                             return false;
                         }
                     }
                 }
                 ClosestNodes.Add(closest);
-                ClosestNodes.RemoveAt(0);
+                if (oldPoint != null)
+                    ClosestNodes.RemoveAt(0);
 
                 return true;
+            }
+
+            public async Task CalculatePath()
+            {
+                int attempt = 0;
+                List<AStarNode> results = new List<AStarNode>();
+                int[] pathResult;
+
+                CurrentPaths.Clear();
+                TripPairFinders.Clear();
+
+                var attemptsPerLevel = 20;
+                var pairLevels = (NodesPerPoint - 1) * PointCount + 1;
+
+                do
+                {
+                    if (attempt % attemptsPerLevel == 0)
+                    {
+                        var nextPaths = GetIntegerSums(PointCount, attempt / attemptsPerLevel, NodesPerPoint - 1);
+                        foreach (var path in nextPaths)
+                        {
+                            AddFindersForPath(path.ToArray());
+                        }
+                    }
+                    attempt++;
+                }
+                while ((pathResult = await FirstCompletedPathOrDefault()) == null &&
+                    attempt < pairLevels * attemptsPerLevel * 2 &&
+                    CurrentPaths.Count > 0);
+
+                for (int i = 0; i < pathResult.Length - 1; i++)
+                {
+                    var key = (i, pathResult[i], pathResult[i + 1]);
+                    var finder = TripPairFinders[key];
+                    Console.WriteLine(finder.Current.GetNodePositions());
+                }
             }
         }
 
@@ -508,13 +607,31 @@ namespace MapDataServer.Services
             //    step.Drop();
             //}
 
-            StringBuilder coords = new StringBuilder();
-            var path = await FindRoute(trip1);
+            var matcher = new PathMatcher(this, 5, 4);
 
-            foreach (var node in path)
+            StringBuilder coords = new StringBuilder();
+            int numPoints = 0;
+            int pt = 0;
+            foreach (var point in trip1)
             {
-                coords.AppendLine($"{node.Latitude}, {node.Longitude}");
+                if (pt % 2 == 0)
+                {
+                    if (await matcher.PushPoint(point.CurrentPoint.GetPoint()))
+                        numPoints++;
+                    if (numPoints == 4)
+                        break;
+                }
+                pt++;
             }
+
+            await matcher.CalculatePath();
+
+            //var path = await FindRoute(trip1);
+
+            //foreach (var node in path)
+            //{
+            //    coords.AppendLine($"{node.Latitude}, {node.Longitude}");
+            //}
 
             return;
             await MemoryDatabase.SetFromRegion(Database, new GeoPoint(-122.30, 47.56), new GeoPoint(-122.14, 47.64));
