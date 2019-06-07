@@ -394,6 +394,29 @@ namespace MapDataServer.Services
             private int NodesPerPoint { get; }
             private int PointCount { get; }
 
+            public static List<List<int>> GetIntegerSums(int count, int sum, int max)
+            {
+                if (count < 1)
+                    return new List<List<int>>();
+                var limit = Math.Min(max, sum);
+                if (count == 1)
+                {
+                    if (sum > limit)
+                        return new List<List<int>>();
+                    return new List<List<int>>() { new List<int>() { sum } };
+                }
+                var result = new List<List<int>>();
+                for (int i = 0; i <= limit; i++)
+                {
+                    foreach (var sub in GetIntegerSums(count - 1, sum - i, max))
+                    {
+                        sub.Insert(0, i);
+                        result.Add(sub);
+                    }
+                }
+                return result;
+            }
+
             public PathMatcher(RouteFinder routeFinder, int nodesPerPoint, int pointCount)
             {
                 RouteFinder = routeFinder;
