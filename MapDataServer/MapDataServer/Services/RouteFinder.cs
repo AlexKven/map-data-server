@@ -607,7 +607,7 @@ namespace MapDataServer.Services
             //    step.Drop();
             //}
 
-            var matcher = new PathMatcher(this, 5, 4);
+            var matcher = new PathMatcher(this, 4, 4);
 
             StringBuilder coords = new StringBuilder();
             int numPoints = 0;
