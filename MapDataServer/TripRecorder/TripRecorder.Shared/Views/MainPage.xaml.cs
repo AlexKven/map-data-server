@@ -21,6 +21,11 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 using TripRecorder.ViewModels;
 using Autofac;
+using Android.Content;
+using TripRecorder.Droid.Intents;
+using Android.App;
+using TripRecorder.Droid;
+using Android.Support.V4.App;
 
 // The Blank Page item template is documented at http://go.microsoft.com/fwlink/?LinkId=402352&clcid=0x409
 
@@ -29,7 +34,7 @@ namespace TripRecorder.Views
     /// <summary>
     /// An empty page that can be used on its own or navigated to within a Frame.
     /// </summary>
-    public sealed partial class MainPage : Page, INotifyPropertyChanged
+    public sealed partial class MainPage : Page
     {
         private MainPageViewModel ViewModel { get; }
 
@@ -39,12 +44,35 @@ namespace TripRecorder.Views
 
             ViewModel = Startup.Container.Resolve<MainPageViewModel>();
             this.DataContext = ViewModel;
-
         }
 
         private async void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            await ViewModel.StartTracking();
+            //var intent = new Intent(this.Context, typeof(LocationIntentService));
+            //intent.PutExtra("Count", 5);
+            //this.Context.StartService(intent);
+
+            Notification notification = new Notification.Builder(this.Context, "testChannel")
+            .SetSmallIcon(Resource.Drawable.Notification)
+            .SetContentTitle("Test Title")
+            .SetContentText("Test Context").Build();
+
+            var channelName = "TestChannel";
+            var channelDescription = "TestChannelDescription";
+            var channel = new NotificationChannel("ChannelId", channelName, NotificationImportance.Default)
+            {
+                Description = channelDescription
+            };
+
+            var notificationManager = (NotificationManager)Context.GetSystemService(Context.NotificationService);
+            notificationManager.CreateNotificationChannel(channel);
+
+            notificationManager.Notify(703, notification);
+
+            //NotificationManagerCompat compat = NotificationManagerCompat.From(this.Context);
+            //compat.Notify(703, notification);
+
+            //await ViewModel.StartTracking();
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)

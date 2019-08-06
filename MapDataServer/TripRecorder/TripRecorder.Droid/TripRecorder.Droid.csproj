@@ -72,10 +72,12 @@
     <PackageReference Include="Newtonsoft.Json">
       <Version>12.0.2</Version>
     </PackageReference>
-    <PackageReference Include="Uno.UI" Version="1.43.1" />
+    <PackageReference Include="Uno.UI" Version="1.44.1" />
     <PackageReference Include="Uno.UniversalImageLoader" Version="1.9.32" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Intents\ILocationIntentService.cs" />
+    <Compile Include="Intents\LocationIntentService.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Main.cs" />
@@ -85,7 +87,7 @@
     <Compile Include="Startup.cs" />
   </ItemGroup>
   <ItemGroup>
-    <AndroidAsset Include="Assets\Fonts\winjs-symbols.ttf" />
+    <!-- <AndroidAsset Include="Assets\Fonts\winjs-symbols.ttf" /> -->
     <AndroidAsset Include="Assets\appsettings.json" />
     <AndroidAsset Include="Assets\secrets.json" />
     <None Include="Resources\AboutResources.txt" />
@@ -102,6 +104,9 @@
   </ItemGroup>
   <ItemGroup>
     <AndroidResource Include="Resources\values\Styles.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <AndroidResource Include="Resources\drawable\Notification.png" />
   </ItemGroup>
   <Import Project="..\TripRecorder.Shared\TripRecorder.Shared.projitems" Label="Shared" />
   <Import Project="..\..\ClientServerShared\ClientServerShared.projitems" Label="Shared" />

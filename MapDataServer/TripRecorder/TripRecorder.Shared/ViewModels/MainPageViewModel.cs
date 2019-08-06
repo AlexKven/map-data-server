@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using TripRecorder.Droid.Intents;
 using Windows.Devices.Geolocation;
 
 namespace TripRecorder.ViewModels
@@ -15,6 +16,8 @@ namespace TripRecorder.ViewModels
     public class MainPageViewModel : INotifyPropertyChanged
     {
         private IConfiguration Configuration { get; }
+        
+        private ILocationIntentService LocationIntentService { get; }
 
         private CancellationTokenSource TokenSource { get; set; } = null;
         private HttpClient HttpClient { get; }
@@ -45,6 +48,7 @@ namespace TripRecorder.ViewModels
         public MainPageViewModel(IConfiguration configuration)
         {
             Configuration = configuration;
+            LocationIntentService = null;
             HttpClient = new HttpClient();
         }
 

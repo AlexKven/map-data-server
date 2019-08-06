@@ -3,6 +3,8 @@ using Android.Widget;
 using Android.OS;
 using Android.Content.PM;
 using Android.Views;
+using TripRecorder.Droid.Intents;
+using Android.Content;
 
 namespace TripRecorder.Droid
 {

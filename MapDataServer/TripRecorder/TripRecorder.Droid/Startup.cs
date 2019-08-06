@@ -15,6 +15,7 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Primitives;
+using TripRecorder.Droid.Intents;
 
 namespace TripRecorder
 {
