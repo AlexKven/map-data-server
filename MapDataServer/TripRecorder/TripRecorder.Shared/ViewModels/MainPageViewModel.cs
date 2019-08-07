@@ -59,9 +59,16 @@ namespace TripRecorder.ViewModels
             request.Content = new StringContent(JsonConvert.SerializeObject(obj));
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 
-            var response = await HttpClient.SendAsync(request);
-            var str = await response.Content.ReadAsStringAsync();
-            return JsonConvert.DeserializeObject<T>(str);
+            try
+            {
+                var response = await HttpClient.SendAsync(request);
+                var str = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<T>(str);
+            }
+            catch (Exception ex)
+            {
+                return default(T);
+            }
         }
 
         public async Task LocationTask(CancellationToken cancellationToken)

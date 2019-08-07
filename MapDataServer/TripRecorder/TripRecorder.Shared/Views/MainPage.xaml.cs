@@ -48,31 +48,7 @@ namespace TripRecorder.Views
 
         private async void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            //var intent = new Intent(this.Context, typeof(LocationIntentService));
-            //intent.PutExtra("Count", 5);
-            //this.Context.StartService(intent);
-
-            Notification notification = new Notification.Builder(this.Context, "testChannel")
-            .SetSmallIcon(Resource.Drawable.Notification)
-            .SetContentTitle("Test Title")
-            .SetContentText("Test Context").Build();
-
-            var channelName = "TestChannel";
-            var channelDescription = "TestChannelDescription";
-            var channel = new NotificationChannel("ChannelId", channelName, NotificationImportance.Default)
-            {
-                Description = channelDescription
-            };
-
-            var notificationManager = (NotificationManager)Context.GetSystemService(Context.NotificationService);
-            notificationManager.CreateNotificationChannel(channel);
-
-            notificationManager.Notify(703, notification);
-
-            //NotificationManagerCompat compat = NotificationManagerCompat.From(this.Context);
-            //compat.Notify(703, notification);
-
-            //await ViewModel.StartTracking();
+            await ViewModel.StartTracking();
         }
 
         private void StopButton_Click(object sender, RoutedEventArgs e)

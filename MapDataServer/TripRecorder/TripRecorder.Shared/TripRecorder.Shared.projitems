@@ -21,6 +21,9 @@
     <Compile Include="$(MSBuildThisFileDirectory)Models\DeviceLocation.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ILocationPollService.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Services\ILocationProvider.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utility\StartLongRunningTaskMessage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utility\StopLongRunningTaskMessage.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Utility\TIckedMessage.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)ViewModels\MainPageViewModel.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Views\MainPage.xaml.cs">
       <DependentUpon>MainPage.xaml</DependentUpon>
