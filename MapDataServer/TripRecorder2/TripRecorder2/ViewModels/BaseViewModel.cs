@@ -5,8 +5,6 @@ using System.Runtime.CompilerServices;
 
 using Xamarin.Forms;
 
-using TripRecorder2.Models;
-
 namespace TripRecorder2.ViewModels
 {
     public class BaseViewModel : INotifyPropertyChanged

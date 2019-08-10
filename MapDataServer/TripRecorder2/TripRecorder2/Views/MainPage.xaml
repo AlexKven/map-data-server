@@ -15,7 +15,7 @@
                 </OnPlatform>
             </NavigationPage.Icon>
             <x:Arguments>
-                <views:AboutPage />
+                <views:TripPage />
             </x:Arguments>
         </NavigationPage>
         <NavigationPage Title="Settings">
@@ -25,7 +25,7 @@
                 </OnPlatform>
             </NavigationPage.Icon>
             <x:Arguments>
-                <views:AboutPage />
+                <views:SettingsPage />
             </x:Arguments>
         </NavigationPage>
         <NavigationPage Title="About">
