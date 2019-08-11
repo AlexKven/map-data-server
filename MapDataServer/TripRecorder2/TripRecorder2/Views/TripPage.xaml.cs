@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -24,13 +25,13 @@ namespace TripRecorder2.Views
         {
             MessagingCenter.Subscribe<TickedMessage>(this, "TickedMessage", message => {
                 Device.BeginInvokeOnMainThread(() => {
-                    Ticker.Text = message.Message;
+                    MessageLabel.Text = message.Message;
                 });
             });
 
             MessagingCenter.Subscribe<CancelledMessage>(this, "CancelledMessage", message => {
                 Device.BeginInvokeOnMainThread(() => {
-                    Ticker.Text = "Cancelled";
+                    MessageLabel.Text = "Cancelled";
                 });
             });
         }
