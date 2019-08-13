@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              x:Class="TripRecorder2.Views.TripPage"
+             xmlns:maps="clr-namespace:Xamarin.Forms.GoogleMaps;assembly=Xamarin.Forms.GoogleMaps"
              Title="{Binding Title}">
     <ContentPage.Content>
         <Grid>
@@ -16,6 +17,7 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
+            <maps:Map Grid.ColumnSpan="2"/>
             <Label x:Name="MessageLabel" Grid.ColumnSpan="2"/>
             <Button Grid.Row="1" Grid.Column="0" HorizontalOptions="Center" Text="Start" Clicked="StartButton_Clicked"/>
             <Button Grid.Row="1" Grid.Column="1" HorizontalOptions="Center" Text="Stop" Clicked="StopButton_Clicked"/>
