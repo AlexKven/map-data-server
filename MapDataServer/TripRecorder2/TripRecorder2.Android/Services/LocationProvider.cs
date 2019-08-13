@@ -17,8 +17,14 @@ namespace TripRecorder2.Droid.Services
 {
     public class LocationProvider : ILocationProvider
     {
-        internal Context Context { private get; set; }
-        internal MainActivity Activity { private get; set; }
+        private Context Context { get; }
+        private MainActivity Activity { get; }
+
+        public LocationProvider(Context context, MainActivity activity)
+        {
+            Context = context;
+            Activity = activity;
+        }
 
         public async Task<bool> CheckPermission()
         {

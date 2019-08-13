@@ -2,6 +2,8 @@
 using Android.Content;
 using Android.OS;
 using Android.Support.V4.App;
+using Autofac;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using TripRecorder2.Models;
@@ -33,11 +35,15 @@ namespace TripRecorder2.Droid.Services
                 try
                 {
                     //INVOKE THE SHARED CODE
-                    var tracker = new LocationTracker(DependencyService.Get<ILocationProvider>());
+                    var tracker = AppStartup.Container.Resolve<LocationTracker>();
                     tracker.Run(TokenSource.Token).Wait();
                 }
                 catch (System.OperationCanceledException)
                 {
+                }
+                catch (Exception ex)
+                {
+
                 }
                 finally
                 {

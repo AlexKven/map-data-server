@@ -20,15 +20,14 @@ namespace TripRecorder2.Services
         private ILocationProvider LocationProvider { get; }
         private HttpClient HttpClient { get; }
         private ConcurrentQueue<TripPoint> PendingPoints { get; } = new ConcurrentQueue<TripPoint>();
-
-        private string server = "https://mapdataserver.azurewebsites.net";
-        private string apiKey = "HARM TO ONGOING MATTER";
+        private IConfiguration Config { get; }
 
         private Trip CurrentTrip { get; set; }
 
-        public LocationTracker(ILocationProvider locationProvider)
+        public LocationTracker(ILocationProvider locationProvider, IConfiguration config)
         {
             LocationProvider = locationProvider;
+            Config = config;
             HttpClient = new HttpClient();
         }
 
@@ -112,8 +111,8 @@ namespace TripRecorder2.Services
 
         private async Task<T> PostObject<T>(T obj, string endpoint)
         {
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{server}/{endpoint}");
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{Config["server"]}/{endpoint}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Config["apikey"]);
             request.Content = new StringContent(JsonConvert.SerializeObject(obj));
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
 

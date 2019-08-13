@@ -21,8 +21,9 @@ namespace TripRecorder2.Droid
     [Activity(Label = "TripRecorder2", Icon = "@mipmap/icon", Theme = "@style/MainTheme", MainLauncher = true, ConfigurationChanges = ConfigChanges.ScreenSize | ConfigChanges.Orientation)]
     public class MainActivity : global::Xamarin.Forms.Platform.Android.FormsAppCompatActivity
     {
+        private Startup Startup { get; set; }
+
         private int PermissionRequestCode = 10;
-        Barrier PermissionSync = new Barrier(1);
         private bool HasLocationPermission { get; set; }
 
         private bool PermissionResponded { get; set; }
@@ -48,7 +49,8 @@ namespace TripRecorder2.Droid
                 StopService(intent);
             });
 
-            SetupLocationProvider();
+            Startup = new Startup(this, ApplicationContext);
+            Startup.InitializeServices();
 
             LoadApplication(new App());
         }
@@ -66,14 +68,6 @@ namespace TripRecorder2.Droid
             base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
         }
 
-        private void SetPermissionSync(int participants)
-        {
-            if (participants > PermissionSync.ParticipantCount)
-                PermissionSync.AddParticipants(participants - PermissionSync.ParticipantCount);
-            if (participants < PermissionSync.ParticipantCount)
-                PermissionSync.RemoveParticipants(PermissionSync.ParticipantCount - participants);
-        }
-
         internal async Task<bool> RequestLocationPermission()
         {
             var permission = Manifest.Permission.AccessFineLocation;
@@ -84,14 +78,6 @@ namespace TripRecorder2.Droid
                 await Task.Delay(250);
 
             return HasLocationPermission;
-        }
-
-        private void SetupLocationProvider()
-        {
-            DependencyService.Register<ILocationProvider, LocationProvider>();
-            var provider = (LocationProvider)DependencyService.Get<ILocationProvider>();
-            provider.Activity = this;
-            provider.Context = ApplicationContext;
         }
     }
 }
