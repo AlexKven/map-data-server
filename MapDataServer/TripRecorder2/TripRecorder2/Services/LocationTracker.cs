@@ -6,6 +6,7 @@ using Plugin.Geolocator.Abstractions;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
@@ -37,8 +38,11 @@ namespace TripRecorder2.Services
             {
                 SendMessage("Starting new trip...");
 
-                var trip = new Trip() { HovStatus = HovStatus.Sov, VehicleType = "Kia Spectra" };
-                CurrentTrip = await PostObject(trip, "trip/start");
+                var trip = new Trip() { HovStatus = HovStatus.Sov, VehicleType = "Kia Spectra", StartTime = DateTime.UtcNow };
+                do
+                {
+                    CurrentTrip = await PostObject(trip, "trip/start");
+                } while (CurrentTrip == null);
 
                 await LocationProvider.CheckPermission();
                 var locator = CrossGeolocator.Current;
@@ -61,16 +65,14 @@ namespace TripRecorder2.Services
                     while (!token.IsCancellationRequested)
                     {
                         await Task.Delay(60000, token);
-
-                        while (PendingPoints.TryDequeue(out var point))
-                        {
-                            await PostObject(point, "trip/point");
-                        }
+                        await SendPendingPoints();
                     }
                 }
                 finally
                 {
                     await locator.StopListeningAsync();
+                    await SendPendingPoints();
+                    await EndTrip();
                 }
             }, token);
         }
@@ -124,7 +126,35 @@ namespace TripRecorder2.Services
             }
             catch (Exception ex)
             {
+                SendMessage($"Error: {ex.Message}");
                 return default(T);
+            }
+        }
+
+        private async Task SendPendingPoints()
+        {
+            List<TripPoint> points = new List<TripPoint>();
+            while (PendingPoints.TryDequeue(out var point))
+            {
+                points.Add(point);
+            }
+            await PostObject(points.ToArray(), "trip/points");
+        }
+
+        private async Task EndTrip()
+        {
+            if (CurrentTrip == null)
+                return;
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{Config["server"]}/trip/end?tripId={CurrentTrip.Id}&endTime={DateTime.UtcNow.ToString("s", CultureInfo.InvariantCulture)}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Config["apikey"]);
+
+            try
+            {
+                await HttpClient.SendAsync(request);
+            }
+            catch (Exception ex)
+            {
+                SendMessage($"Error: {ex.Message}");
             }
         }
     }
