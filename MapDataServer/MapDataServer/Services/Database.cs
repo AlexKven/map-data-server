@@ -101,6 +101,8 @@ namespace MapDataServer.Services
             if (!tableTypes.Contains("Trips"))
             {
                 await this.CreateTableAsync<Trip>();
+                await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX StartTime(StartTime);");
+                await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX EndTime(EndTime);");
             }
             if (!tableTypes.Contains("TripPoints"))
             {

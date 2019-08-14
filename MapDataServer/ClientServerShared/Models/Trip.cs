@@ -29,13 +29,18 @@ namespace MapDataServer.Models
         public string VehicleType { get; set; }
 
 #if __SERVER__
-        [Column(Name = nameof(BusRoute)), DataType("VARCHAR(16)")]
-#endif
-        public string BusRoute { get; set; }
-
-#if __SERVER__
         [Column(Name = nameof(InProgress)), DataType(LinqToDB.DataType.Boolean)]
 #endif
         public bool InProgress { get; set; }
+
+#if __SERVER__
+        [Column(Name = nameof(StartTime)), NotNull, DataType(LinqToDB.DataType.DateTime)]
+#endif
+        public DateTime StartTime { get; set; }
+
+#if __SERVER__
+        [Column(Name = nameof(EndTime)), DataType(LinqToDB.DataType.DateTime)]
+#endif
+        public DateTime? EndTime { get; set; }
     }
 }

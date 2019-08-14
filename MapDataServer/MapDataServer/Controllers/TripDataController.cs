@@ -24,7 +24,7 @@ namespace MapDataServer.Controllers
         }
 
         [HttpPost("start")]
-        public async Task<ActionResult<string>> StartTrip([FromBody] Trip trip)
+        public async Task<ActionResult> StartTrip([FromBody] Trip trip)
         {
             await Database.Initializer;
             if (!IsAuthorized())
@@ -38,18 +38,58 @@ namespace MapDataServer.Controllers
             return new JsonResult(trip);
         }
 
-        [HttpPost("point")]
-        public async Task<ActionResult<string>> PostPoint([FromBody] TripPoint point)
+        [HttpPost("end")]
+        public async Task<ActionResult> EndTrip([FromQuery] long tripId, [FromQuery] DateTime endTime)
         {
             await Database.Initializer;
             if (!IsAuthorized())
                 return Unauthorized();
 
+            var trip = await Database.Trips.Where(t => t.Id == tripId).FirstOrDefaultAsync();
+            if (trip == null)
+                return NotFound();
+
+            trip.EndTime = endTime;
+            await Database.InsertOrReplaceAsync(trip);
+            return Ok();
+        }
+
+        [HttpPost("point")]
+        public async Task<ActionResult> PostPoint([FromBody] TripPoint point)
+        {
+            await Database.Initializer;
+            if (!IsAuthorized())
+                return Unauthorized();
+
+            return new JsonResult(InsertPointAndGenerateId(point));
+        }
+
+        [HttpPost("points")]
+        public async Task<ActionResult> PostPoints([FromBody] TripPoint[] points)
+        {
+            await Database.Initializer;
+            if (!IsAuthorized())
+                return Unauthorized();
+
+            if (points.Length == 0)
+                return NoContent();
+
+            var results = new TripPoint[points.Length];
+            for (int i = 0; i < points.Length; i++)
+            {
+                results[i] = await InsertPointAndGenerateId(points[i]);
+            }
+
+            return new JsonResult(results);
+        }
+
+        private async Task<TripPoint> InsertPointAndGenerateId(TripPoint point)
+        {
             var idBytes = new byte[8];
             new Random().NextBytes(idBytes);
             point.Id = BitConverter.ToInt64(idBytes, 0);
             await Database.InsertAsync(point);
-            return new JsonResult(point);
+            return point;
         }
     }
 }
