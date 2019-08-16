@@ -18,5 +18,6 @@ namespace TripRecorder2.Droid
         public const string SERVICE_STARTED_KEY = "has_service_been_started";
 
         public const string ACTION_MAIN_ACTIVITY = "ServicesDemo3.action.MAIN_ACTIVITY";
+        public const string ACTION_END_TRIP = "ServicesDemo3.action.STOP_SERVICE";
     }
 }

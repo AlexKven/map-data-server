@@ -29,37 +29,50 @@ namespace TripRecorder2.Droid.Services
 
         public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
         {
-            TokenSource = new CancellationTokenSource();
+            if (intent.Action == Constants.ACTION_END_TRIP)
+            {
+                StopSelf();
+            }
+            else
+            {
+                TokenSource = new CancellationTokenSource();
 
-            Task.Run(() => {
-                try
+                Task.Run(() =>
                 {
-                    //INVOKE THE SHARED CODE
-                    var tracker = AppStartup.Container.Resolve<LocationTracker>();
-                    tracker.Run(TokenSource.Token).Wait();
-                }
-                catch (System.OperationCanceledException)
-                {
-                }
-                catch (Exception ex)
-                {
-
-                }
-                finally
-                {
-                    if (TokenSource.IsCancellationRequested)
+                    try
                     {
-                        StopForeground(true);
-                        var message = new CancelledMessage();
-                        Device.BeginInvokeOnMainThread(
-                            () => MessagingCenter.Send(message, "CancelledMessage")
-                        );
+                        //INVOKE THE SHARED CODE
+                        var tracker = AppStartup.Container.Resolve<LocationTracker>();
+                        tracker.Run(TokenSource.Token).Wait();
                     }
-                }
+                    catch (System.OperationCanceledException)
+                    {
+                    }
+                    catch (Exception ex)
+                    {
 
-            }, TokenSource.Token);
+                    }
+                    finally
+                    {
+                        if (TokenSource.IsCancellationRequested)
+                        {
+                            StopForeground(true);
+                            StopTracker();
+                        }
+                    }
+
+                }, TokenSource.Token);
+            }
 
             return StartCommandResult.Sticky;
+        }
+
+        private void StopTracker()
+        {
+            var message = new CancelledMessage();
+            Device.BeginInvokeOnMainThread(
+                () => MessagingCenter.Send(message, "CancelledMessage")
+            );
         }
 
         public override void OnDestroy()
@@ -86,11 +99,24 @@ namespace TripRecorder2.Droid.Services
             NotificationManager notificationManager = (NotificationManager)GetSystemService(NotificationService);
             notificationManager.CreateNotificationChannel(channel);
             Notification.Builder builder = new Notification.Builder(ApplicationContext, "Channel_01");
-            builder.SetSmallIcon(Resource.Drawable.ic_stat_name);
+            builder.SetSmallIcon(Resource.Drawable.ic_trip);
             builder.SetContentTitle("Trip Recorder II");
             builder.SetContentText("Your trip is recording.");
             builder.SetContentIntent(BuildIntentToShowMainActivity());
+            builder.AddAction(BuildEndTripAction());
             builder.SetOngoing(true);
+            return builder.Build();
+        }
+
+        private Notification.Action BuildEndTripAction()
+        {
+            var stopServiceIntent = new Intent(this, GetType());
+            stopServiceIntent.SetAction(Constants.ACTION_END_TRIP);
+            var stopServicePendingIntent = PendingIntent.GetService(this, 0, stopServiceIntent, 0);
+
+            var builder = new Notification.Action.Builder(Android.Resource.Drawable.IcMediaPause,
+                                                          GetText(Resource.String.end_trip),
+                                                          stopServicePendingIntent);
             return builder.Build();
         }
 
