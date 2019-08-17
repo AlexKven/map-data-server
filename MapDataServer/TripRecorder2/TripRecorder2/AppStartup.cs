@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TripRecorder2.Services;
+using TripRecorder2.ViewModels;
 
 namespace TripRecorder2
 {
@@ -21,6 +23,8 @@ namespace TripRecorder2
             InitializePlatformServices(builder);
 
             builder.Register(cc => Container).As<IContainer>();
+            builder.RegisterType<TripPagePointsListService>().SingleInstance();
+            builder.RegisterType<TripPageViewModel>().SingleInstance();
             //builder.RegisterType<MainPageViewModel>();
 
             try

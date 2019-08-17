@@ -22,14 +22,16 @@ namespace TripRecorder2.Services
         private HttpClient HttpClient { get; }
         private ConcurrentQueue<TripPoint> PendingPoints { get; } = new ConcurrentQueue<TripPoint>();
         private IConfiguration Config { get; }
+        private TripPagePointsListService PointsListService { get; }
 
         private Trip CurrentTrip { get; set; }
 
-        public LocationTracker(ILocationProvider locationProvider, IConfiguration config)
+        public LocationTracker(TripPagePointsListService pointsListService, ILocationProvider locationProvider, IConfiguration config)
         {
             LocationProvider = locationProvider;
             Config = config;
             HttpClient = new HttpClient();
+            PointsListService = pointsListService;
         }
 
         public async Task Run(CancellationToken token)
@@ -85,8 +87,6 @@ namespace TripRecorder2.Services
         {
             var position = e.Position;
 
-            SendMessage($"{position.Latitude}, {position.Longitude} ({position.Accuracy}, {DateTime.Now.ToString("HH:mm:ss")}");
-
             var point = new TripPoint()
             {
                 Longitude = position.Longitude,
@@ -96,6 +96,10 @@ namespace TripRecorder2.Services
                 TripId = CurrentTrip?.Id ?? 0
             };
             PendingPoints.Enqueue(point);
+            PointsListService.TripPagePoints.Enqueue(point);
+
+            SendMessage($"Point: {position.Latitude}, {position.Longitude} ({position.Accuracy}, {DateTime.Now.ToString("HH:mm:ss")})");
+
         }
 
         private void SendMessage(string message)

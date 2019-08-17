@@ -10,16 +10,16 @@
     <ContentPage.Content>
         <Grid>
             <Grid.RowDefinitions>
+                <RowDefinition Height="auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="auto"/>
             </Grid.RowDefinitions>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Label x:Name="MessageLabel" Grid.ColumnSpan="2"/>
-            <Button Grid.Row="1" Grid.Column="0" HorizontalOptions="Center" Text="Start" Clicked="StartButton_Clicked"/>
-            <Button Grid.Row="1" Grid.Column="1" HorizontalOptions="Center" Text="Stop" Clicked="StopButton_Clicked"/>
+            <Label Text="{Binding DisplayMessage}" HorizontalOptions="Center"/>
+            <maps:Map Grid.Row="1" ItemsSource="{Binding MapPins, Mode=OneTime}" x:Name="MainMap"/>
+            <Button Grid.Row="2" HorizontalOptions="Center"
+                    Text="{Binding StartStopButtonText}"
+                    Command="{Binding StartStopCommand}"
+                    IsEnabled="{Binding IsStartStopButtonEnabled}"/>
         </Grid>
     </ContentPage.Content>
 </ContentPage>
