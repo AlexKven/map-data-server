@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using LinqToDB;
 using MapDataServer.Models;
@@ -32,7 +33,8 @@ namespace MapDataServer.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<string>>> Get()
         {
-            //await Database.Initializer;
+            await Database.Initializer;
+            await Test();
             //await MapDownloader.DownloadMapRegions(-12245, 4728, 22, 15);
 
             //var wayFinder = new RouteFinder(Database);
@@ -108,6 +110,41 @@ namespace MapDataServer.Controllers
         [HttpDelete("{id}")]
         public void Delete(int id)
         {
+        }
+
+        public async Task Test()
+        {
+            var points = await Database.TripPoints.Where(p => p.TripId == -122338418954791632).ToArrayAsync();
+            var avgPoints = new (double Latitude, double Longitude)[points.Length - 2];
+
+            for (int i = 0; i < points.Length - 2; i++)
+            {
+                var first = points[i];
+                var middle = points[i + 1];
+                var last = points[i + 2];
+
+                var avgRange = (first.RangeRadius + last.RangeRadius) / 2;
+                var timeFactor = (middle.Time - first.Time) / (last.Time - first.Time);
+                var rangeFactor = avgRange / (avgRange + middle.RangeRadius);
+
+                var initialProjection = (Latitude: first.Latitude + (last.Latitude - first.Latitude) * timeFactor,
+                                        Longitude: first.Longitude + (last.Longitude - first.Longitude) * timeFactor);
+                var revisedProjection = (Latitude: initialProjection.Latitude + (middle.Latitude - initialProjection.Latitude) * rangeFactor,
+                                        Longitude: initialProjection.Longitude + (middle.Longitude - initialProjection.Longitude) * rangeFactor);
+
+                avgPoints[i] = revisedProjection;
+            }
+
+            var builder = new StringBuilder();
+            foreach(var pt in avgPoints)
+            {
+                if (double.IsNaN(pt.Latitude) || double.IsNaN(pt.Longitude))
+                    continue;
+                if (builder.Length > 0)
+                    builder.AppendLine();
+                builder.Append($"{pt.Latitude},{pt.Longitude}");
+            }
+            var str = builder.ToString();
         }
     }
 }
