@@ -21,6 +21,7 @@ namespace MapDataServer.Services
         ITable<WayNodeLink> WayNodeLinks { get; }
         ITable<Trip> Trips { get; }
         ITable<TripPoint> TripPoints { get; }
+        ITable<ObaTripLink> ObaTripLinks { get; }
         Task Initializer { get; }
 
         Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false);

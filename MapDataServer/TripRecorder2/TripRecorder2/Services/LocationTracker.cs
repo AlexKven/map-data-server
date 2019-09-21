@@ -23,15 +23,17 @@ namespace TripRecorder2.Services
         private ConcurrentQueue<TripPoint> PendingPoints { get; } = new ConcurrentQueue<TripPoint>();
         private IConfiguration Config { get; }
         private TripPagePointsListService PointsListService { get; }
+        private TripSettingsProvider TripSettingsProvider { get; }
 
         private Trip CurrentTrip { get; set; }
 
-        public LocationTracker(TripPagePointsListService pointsListService, ILocationProvider locationProvider, IConfiguration config)
+        public LocationTracker(TripPagePointsListService pointsListService, ILocationProvider locationProvider, TripSettingsProvider tripSettingsProvider, IConfiguration config)
         {
             LocationProvider = locationProvider;
             Config = config;
             HttpClient = new HttpClient();
             PointsListService = pointsListService;
+            TripSettingsProvider = tripSettingsProvider;
         }
 
         public async Task Run(CancellationToken token)
@@ -40,11 +42,22 @@ namespace TripRecorder2.Services
             {
                 SendMessage("Starting new trip...");
 
-                var trip = new Trip() { HovStatus = HovStatus.Sov, VehicleType = "Kia Spectra", StartTime = DateTime.UtcNow };
+                var trip = new Trip()
+                {
+                    HovStatus = TripSettingsProvider.HovStatus,
+                    VehicleType = TripSettingsProvider.VehicleType,
+                    StartTime = DateTime.UtcNow
+                };
                 do
                 {
                     CurrentTrip = await PostObject(trip, "trip/start");
                 } while (CurrentTrip == null);
+
+                if (TripSettingsProvider.ObaTripId != null)
+                {
+                    int attempt = 0;
+                    while (!(await SetObaDetails()) && attempt++ < 10) ;
+                }
 
                 await LocationProvider.CheckPermission();
                 var locator = CrossGeolocator.Current;
@@ -159,6 +172,25 @@ namespace TripRecorder2.Services
             catch (Exception ex)
             {
                 SendMessage($"Error: {ex.Message}");
+            }
+        }
+
+        private async Task<bool> SetObaDetails()
+        {
+            if (CurrentTrip == null)
+                return true;
+            var request = new HttpRequestMessage(HttpMethod.Post, $"{Config["server"]}/trip/setObaTrip?tripId={CurrentTrip.Id}&obaTripId={TripSettingsProvider.ObaTripId}&obaVehicleId={TripSettingsProvider.ObaVehicleId}");
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Config["apikey"]);
+
+            try
+            {
+                await HttpClient.SendAsync(request);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                SendMessage($"Error: {ex.Message}");
+                return false;
             }
         }
     }

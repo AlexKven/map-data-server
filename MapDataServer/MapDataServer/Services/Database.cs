@@ -43,6 +43,8 @@ namespace MapDataServer.Services
 
         public ITable<TripPoint> TripPoints => GetTable<TripPoint>();
 
+        public ITable<ObaTripLink> ObaTripLinks => GetTable<ObaTripLink>();
+
         private async Task InitializeAsync()
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -111,6 +113,10 @@ namespace MapDataServer.Services
                 await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Latitude(Latitude);");
                 await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Time(Time);");
                 await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX TripId(TripId);");
+            }
+            if (!tableTypes.Contains("ObaTripLinks"))
+            {
+                await this.CreateTableAsync<ObaTripLink>();
             }
         }
 

@@ -78,7 +78,7 @@ namespace TripRecorder2.Droid
             builder.RegisterInstance(Activity);
             builder.RegisterInstance(Context);
             builder.RegisterType<LocationProvider>().As<ILocationProvider>();
-            builder.RegisterType<LocationTracker>();
+            builder.RegisterType<LocationTracker>().SingleInstance();
             builder.RegisterInstance(config);
         }
 

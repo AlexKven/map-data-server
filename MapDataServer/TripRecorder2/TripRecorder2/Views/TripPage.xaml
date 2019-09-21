@@ -13,10 +13,30 @@
                 <RowDefinition Height="auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
+                <RowDefinition Height="auto"/>
             </Grid.RowDefinitions>
             <Label Text="{Binding DisplayMessage}" HorizontalOptions="Center"/>
             <maps:Map Grid.Row="1" ItemsSource="{Binding MapPins, Mode=OneTime}" x:Name="MainMap"/>
-            <Button Grid.Row="2" HorizontalOptions="Center"
+            <Grid Grid.Row="2" IsEnabled="{Binding CanSetTripDetails}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Entry Text="{Binding CurrentVehicleType}" Placeholder="Vehicle Type"/>
+                <Picker Grid.Column="1" ItemsSource="{Binding HovStatuses}" SelectedItem="{Binding CurrentHovStatus}"/>
+            </Grid>
+            <Grid Grid.Row="3" IsEnabled="{Binding CanSetTripDetails}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Entry Placeholder="Trip ID" Text="{Binding CurrentTripId}" Grid.Column="0"/>
+                <Button Text="Get trip by vehicle" Command="{Binding FindTripByVehicleCommand}" Grid.Column="1"/>
+                <Entry Placeholder="Vehicle ID" Text="{Binding VehicleId}" Grid.Column="2"/>
+            </Grid>
+            <Button Grid.Row="4" HorizontalOptions="Center"
                     Text="{Binding StartStopButtonText}"
                     Command="{Binding StartStopCommand}"
                     IsEnabled="{Binding IsStartStopButtonEnabled}"/>

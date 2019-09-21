@@ -30,5 +30,30 @@ namespace MapDataServer.Models
         [LinqToDB.Mapping.MapValue(Value = nameof(Transit))]
 #endif
         Transit,
+
+#if __SERVER__
+        [LinqToDB.Mapping.MapValue(Value = nameof(Pedestrian))]
+#endif
+        Pedestrian,
+
+#if __SERVER__
+        [LinqToDB.Mapping.MapValue(Value = nameof(Bicycle))]
+#endif
+        Bicycle,
+
+#if __SERVER__
+        [LinqToDB.Mapping.MapValue(Value = nameof(Streetcar))]
+#endif
+        Streetcar,
+
+#if __SERVER__
+        [LinqToDB.Mapping.MapValue(Value = nameof(LightRail))]
+#endif
+        LightRail,
+
+#if __SERVER__
+        [LinqToDB.Mapping.MapValue(Value = nameof(HeavyRail))]
+#endif
+        HeavyRail,
     }
 }

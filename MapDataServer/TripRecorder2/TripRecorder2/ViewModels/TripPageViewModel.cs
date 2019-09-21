@@ -1,10 +1,15 @@
 ﻿using MapDataServer.Models;
+using Microsoft.Extensions.Configuration;
 using MvvmHelpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Input;
+using System.Xml;
+using System.Xml.Serialization;
 using TripRecorder2.Models;
 using TripRecorder2.Services;
 using Xamarin.Forms;
@@ -36,20 +41,37 @@ namespace TripRecorder2.ViewModels
                     StartStopButtonText = value ? "Stop Recording" : "Start Recording";
                 }
                 _IsInProgress = value;
+                CanSetTripDetails = !value;
             }
+        }
+
+        private bool _CanSetTripDetails = true;
+        public bool CanSetTripDetails
+        {
+            get => _CanSetTripDetails;
+            private set => SetProperty(ref _CanSetTripDetails, value);
         }
 
         private TripPagePointsListService PointsListService { get; }
 
-        public TripPageViewModel(TripPagePointsListService pointsListService)
+        private TripSettingsProvider TripSettingsProvider { get; }
+
+        private IConfiguration Config;
+
+        public TripPageViewModel(IConfiguration config, TripPagePointsListService pointsListService, TripSettingsProvider tripSettingsProvider)
         {
+            Config = config;
             PointsListService = pointsListService;
+            TripSettingsProvider = tripSettingsProvider;
             Title = "Current Trip";
             StartStopCommand = new Command(StartStopRecording);
+            FindTripByVehicleCommand = new Command(FindTripByVehicle);
             HandleReceivedMessages();
         }
 
         public ICommand StartStopCommand { get; }
+
+        public ICommand FindTripByVehicleCommand { get; }
 
         private string _StartStopButtonText = "Start Recording";
         public string StartStopButtonText
@@ -72,6 +94,46 @@ namespace TripRecorder2.ViewModels
             set => SetProperty(ref _IsStartStopButtonEnabled, value);
         }
 
+        public HovStatus[] HovStatuses { get; } = new HovStatus[] {
+            HovStatus.Sov,
+            HovStatus.Hov2,
+            HovStatus.Hov3,
+            HovStatus.Motorcycle,
+            HovStatus.Transit,
+            HovStatus.Pedestrian,
+            HovStatus.Bicycle,
+            HovStatus.Streetcar,
+            HovStatus.LightRail,
+            HovStatus.HeavyRail};
+
+        private HovStatus _CurrentHovStatus = HovStatus.Sov;
+        public HovStatus CurrentHovStatus
+        {
+            get => _CurrentHovStatus;
+            set => SetProperty(ref _CurrentHovStatus, value);
+        }
+
+        private string _CurrentVehicleType;
+        public string CurrentVehicleType
+        {
+            get => _CurrentVehicleType;
+            set => SetProperty(ref _CurrentVehicleType, value);
+        }
+
+        private string _CurrentTripId;
+        public string CurrentTripId
+        {
+            get => _CurrentTripId;
+            set => SetProperty(ref _CurrentTripId, value);
+        }
+
+        private string _VehicleId;
+        public string VehicleId
+        {
+            get => _VehicleId;
+            set => SetProperty(ref _VehicleId, value);
+        }
+
         public void StartStopRecording()
         {
             if (IsInProgress)
@@ -86,8 +148,41 @@ namespace TripRecorder2.ViewModels
                 PointsListService.Reset();
                 ShowPointsOnMap();
                 var message = new StartLongRunningTaskMessage();
+                TripSettingsProvider.HovStatus = CurrentHovStatus;
+                TripSettingsProvider.VehicleType = string.IsNullOrEmpty(CurrentVehicleType) ? null : CurrentVehicleType;
+                TripSettingsProvider.ObaTripId = string.IsNullOrEmpty(CurrentTripId) ? null : CurrentTripId;
+                TripSettingsProvider.ObaVehicleId = string.IsNullOrEmpty(VehicleId) ? null : VehicleId;
                 MessagingCenter.Send(message, "StartLongRunningTaskMessage");
                 IsInProgress = true;
+            }
+        }
+
+        public async void FindTripByVehicle()
+        {
+            CurrentTripId = "Loading...";
+            var tripId = await GetTripIdForVehicleId(VehicleId);
+            CurrentTripId = tripId ?? "";
+        }
+
+        private async Task<string> GetTripIdForVehicleId(string vehicleId)
+        {
+            var httpClient = new HttpClient();
+            var url = $"https://api.pugetsound.onebusaway.org/api/where/trip-for-vehicle/{vehicleId}.xml?key={Config["obaKey"]}";
+            var request = new HttpRequestMessage();
+            request.RequestUri = new Uri(url);
+            try
+            {
+                var response = await httpClient.SendAsync(request);
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                    return null;
+                var content = await response.Content.ReadAsStringAsync();
+                var doc = new XmlDocument();
+                doc.LoadXml(content);
+                return doc.SelectSingleNode("/response/data/entry/tripId")?.InnerText;
+            }
+            catch (Exception)
+            {
+                return null;
             }
         }
 

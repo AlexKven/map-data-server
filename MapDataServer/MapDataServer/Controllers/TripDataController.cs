@@ -54,6 +54,15 @@ namespace MapDataServer.Controllers
             return Ok();
         }
 
+        [HttpPost("setObaTrip")]
+        public async Task<ActionResult> SetObaTrip([FromQuery] long tripId, [FromQuery] string obaTripId, [FromQuery] string obaVehicleId = null)
+        {
+            await Database.Initializer;
+            var link = new ObaTripLink() { MapTripId = tripId, ObaTripId = obaTripId, ObaVehicleId = obaVehicleId };
+            await Database.InsertOrReplaceAsync(link);
+            return Ok();
+        }
+
         [HttpPost("point")]
         public async Task<ActionResult> PostPoint([FromBody] TripPoint point)
         {
