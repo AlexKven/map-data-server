@@ -16,11 +16,13 @@ namespace MapDataServer.Controllers
     public class TripDataController : BaseController
     {
         private IDatabase Database { get; }
+        private ITripPreprocessor TripPreprocessor { get; }
 
-        public TripDataController(IDatabase database, IConfiguration configuration)
+        public TripDataController(IDatabase database, IConfiguration configuration, ITripPreprocessor tripPreprocessor)
             :base(configuration)
         {
             Database = database;
+            TripPreprocessor = tripPreprocessor;
         }
 
         [HttpPost("start")]
@@ -99,6 +101,13 @@ namespace MapDataServer.Controllers
             point.Id = BitConverter.ToInt64(idBytes, 0);
             await Database.InsertAsync(point);
             return point;
+        }
+
+        [HttpGet("preprocessTrip")]
+        public async Task<ActionResult> PreprocessTrip([FromQuery] long tripId)
+        {
+            var result = await TripPreprocessor.PreprocessTrip(tripId);
+            return new JsonResult(result);
         }
     }
 }

@@ -42,5 +42,10 @@ namespace MapDataServer.Models
         [Column(Name = nameof(Time)), NotNull, DataType(LinqToDB.DataType.DateTime)]
 #endif
         public DateTime Time { get; set; }
+
+#if __SERVER__
+        [Column(Name = nameof(IsTailPoint)), DataType(LinqToDB.DataType.Boolean)]
+#endif
+        public bool? IsTailPoint { get; set; }
     }
 }

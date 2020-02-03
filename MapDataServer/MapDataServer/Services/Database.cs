@@ -106,6 +106,13 @@ namespace MapDataServer.Services
                 await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX StartTime(StartTime);");
                 await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX EndTime(EndTime);");
             }
+            if (!tableTypes.Contains("PreprocessedTrips"))
+            {
+                await this.CreateTableAsync<PreprocessedTrip>();
+                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX ActualStartTime(ActualStartTime);");
+                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX ActualEndTime(ActualEndTime);");
+                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX DistanceMeters(DistanceMeters);");
+            }
             if (!tableTypes.Contains("TripPoints"))
             {
                 await this.CreateTableAsync<TripPoint>();

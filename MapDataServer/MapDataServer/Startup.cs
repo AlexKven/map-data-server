@@ -35,6 +35,7 @@ namespace MapDataServer
             .AddSingleton<IDataProvider>(svc => svc.GetService<LinqToDB.DataProvider.MySql.MySqlDataProvider>())
             .AddSingleton<IDatabase, Database>()
             .AddSingleton<IMapDownloader, MapDownloader>()
+            .AddSingleton<ITripPreprocessor, TripPreprocessor>()
             .AddHttpClient();
         }
 

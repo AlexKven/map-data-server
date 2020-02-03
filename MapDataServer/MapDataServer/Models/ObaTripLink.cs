@@ -12,7 +12,7 @@ namespace MapDataServer.Models
         [Column(Name = nameof(MapTripId)), PrimaryKey, NotNull, DataType(LinqToDB.DataType.Int64)]
         public long MapTripId { get; set; }
 
-        [Column(Name = nameof(ObaTripId)), NotNull, DataType("VARCHAR(20)")]
+        [Column(Name = nameof(ObaTripId)), NotNull, DataType("VARCHAR(64)")]
         public string ObaTripId { get; set; }
 
         [Column(Name = nameof(ObaVehicleId)), DataType("VARCHAR(20)")]
