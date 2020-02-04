@@ -20,12 +20,15 @@ namespace MapDataServer.Controllers
         private IDatabase Database { get; }
         private IHttpClientFactory HttpClientFactory { get; }
         private IMapDownloader MapDownloader { get; }
-        public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory, IMapDownloader mapDownloader, IConfiguration configuration)
+        private ITripProcessorStatus TripProcessorStatus { get; }
+        public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory, IMapDownloader mapDownloader,
+            IConfiguration configuration, ITripProcessorStatus tripProcessorStatus)
             : base(configuration)
         {
             Database = database;
             HttpClientFactory = httpClientFactory;
             MapDownloader = mapDownloader;
+            TripProcessorStatus = tripProcessorStatus;
         }
 
         // GET api/values
@@ -83,6 +86,12 @@ namespace MapDataServer.Controllers
             //}
 
             return new string[] { "value1", "value2" };
+        }
+
+        [HttpGet("tripProcessorRuns")]
+        public async Task<ActionResult<string>> TripProcessorRuns()
+        {
+            return new OkObjectResult(TripProcessorStatus.RunCount);
         }
 
         // GET api/values/5
