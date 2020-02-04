@@ -20,74 +20,183 @@ namespace MapDataServer.Services
         {
             await Database.Initializer;
 
-            var pointsFromStart = (from point in Database.TripPoints
-                                   where point.TripId == tripId
-                                   orderby point.Time ascending
-                                   select point).ToAsyncEnumerable();
-            var startTailPointsCount = await GetTailPointsCount(pointsFromStart);
-            var pointsFromEnd = (from point in Database.TripPoints
-                                   where point.TripId == tripId
-                                   orderby point.Time descending
-                                   select point).ToAsyncEnumerable();
-            var endTailPointsCount = await GetTailPointsCount(pointsFromEnd);
-            var total = await pointsFromStart.Count();
+            var duplicates = new List<TripPoint>();
+            var points = await (from point in Database.TripPoints
+                                where point.TripId == tripId
+                                orderby point.Time ascending
+                                select point).ToListAsync();
+
+            DeDupe(points, duplicates);
+
+            foreach (var point in duplicates)
+            {
+                await Database.DeleteAsync(point);
+            }
+            duplicates.Clear();
+
+            StringBuilder builder = new StringBuilder();
+            foreach (var point in points)
+                builder.AppendLine($"{point.Latitude},{point.Longitude}");
+            var res = builder.ToString();
+
+
+            var startTailPointsCount = GetTailPointsCount(points);
+            var pointsFromEnd = points.Reverse<TripPoint>();
+            var endTailPointsCount = GetTailPointsCount(pointsFromEnd);
+            var total = points.Count;
 
             var pointsToUpdate = new List<TripPoint>();
 
-            await pointsFromStart.Take(startTailPointsCount).ForEachAsync(async point =>
+            foreach (var point in points.Take(startTailPointsCount))
             {
                 point.IsTailPoint = true;
                 pointsToUpdate.Add(point);
-            });
+            }
 
-            await pointsFromEnd.Take(endTailPointsCount).ForEachAsync(async point =>
+            foreach (var point in pointsFromEnd.Take(endTailPointsCount))
             {
                 point.IsTailPoint = true;
                 pointsToUpdate.Add(point);
-            });
+            }
+
+            foreach (var point in pointsToUpdate)
+            {
+                await Database.InsertOrReplaceAsync(point);
+            }
+            pointsToUpdate.Clear();
+
+            var result = new PreprocessedTrip();
+            var usefulPoints = points.Skip(startTailPointsCount).Take(total - startTailPointsCount - endTailPointsCount);
+            foreach (var pt in usefulPoints)
+            {
+                pt.IsTailPoint = false;
+                pointsToUpdate.Add(pt);
+            }
+
+            var distance = GetTotalLength(usefulPoints);
 
             foreach (var point in pointsToUpdate)
             {
                 await Database.InsertOrReplaceAsync(point);
             }
 
-            pointsToUpdate.Clear();
-            var result = new PreprocessedTrip();
-            var usefulPoints = pointsFromStart.Skip(startTailPointsCount).Take(total - startTailPointsCount - endTailPointsCount);
+            DateTime actualStartTime;
+            DateTime actualEndTime;
+            if (usefulPoints.Any())
+            {
+                actualStartTime = (usefulPoints.First()).Time;
+                actualEndTime = (usefulPoints.Last()).Time;
+            }
+            else if (points.Any())
+            {
+                actualStartTime = actualEndTime = points.First().Time;
+            }
+            else
+                actualStartTime = actualEndTime = (await Database.Trips.FirstAsync(t => t.Id == tripId)).StartTime;
 
-            return new PreprocessedTrip();
+            var preprocessed = new PreprocessedTrip()
+            {
+                Id = tripId,
+                ActualStartTime = actualStartTime,
+                ActualEndTime = actualEndTime,
+                DistanceMeters = distance
+            };
+            await Database.InsertOrReplaceAsync(preprocessed);
+            return preprocessed;
         }
 
-        private static async Task<int> GetTailPointsCount(IAsyncEnumerable<TripPoint> points)
+        private static bool AreEffectivelyEqual(TripPoint p1, TripPoint p2) =>
+            p1?.Latitude == p2?.Latitude && p1?.Longitude == p2.Longitude;
+
+        private static void DeDupe(List<TripPoint> points, List<TripPoint> dupes)
+        {
+            TripPoint lastPoint = null;
+            for (int i = 0; i < points.Count; i++)
+            {
+                var point = points[i];
+                if (lastPoint == null)
+                    lastPoint = point;
+                else
+                {
+                    if (AreEffectivelyEqual(lastPoint, point))
+                    {
+                        dupes.Add(point);
+                        points.RemoveAt(i);
+                        i--;
+                    }
+                    else
+                        lastPoint = point;
+                }
+            }
+        }
+
+        private static int GetTailPointsCount(IEnumerable<TripPoint> points)
         {
             double distance = 0;
             TripPoint lastUsefulPoint = null;
             (double lat, double lon)? lastUsefulPointEdge = null;
 
-            int currentPointId = -1;
-            var enumerator = points.GetEnumerator();
-            while (await enumerator.MoveNext() && (distance < 30 || lastUsefulPoint?.Time == enumerator.Current?.Time))
+            int currentPointIndex = -1;
+            using (var enumerator = points.GetEnumerator())
             {
-                currentPointId++;
-                if (lastUsefulPoint == null)
-                    lastUsefulPoint = enumerator.Current;
-                else
+                bool notAtEnd;
+                while (notAtEnd = enumerator.MoveNext() && distance < 20)
                 {
-                    var point = enumerator.Current;
-                    var dist = ShortestDistanceBetweenPoints(lastUsefulPoint, point);
-                    if (dist.HasValue)
+                    currentPointIndex++;
+                    if (lastUsefulPoint == null)
+                        lastUsefulPoint = enumerator.Current;
+                    else
                     {
-                        distance += dist.Value.dist;
-                        if (lastUsefulPointEdge != null)
-                            distance += GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
-                                dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
-                        lastUsefulPoint = point;
-                        lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
+                        var point = enumerator.Current;
+                        var dist = ShortestDistanceBetweenPoints(lastUsefulPoint, point);
+                        if (dist.HasValue)
+                        {
+                            distance += dist.Value.dist;
+                            if (lastUsefulPointEdge != null)
+                                distance += GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
+                                    dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
+                            lastUsefulPoint = point;
+                            lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
+                        }
                     }
                 }
+                if (!notAtEnd)
+                    return currentPointIndex;
+                return currentPointIndex - 1;
             }
-            enumerator.Dispose();
-            return currentPointId - 1;
+        }
+
+        private static uint GetTotalLength(IEnumerable<TripPoint> points)
+        {
+            double distance = 0;
+            TripPoint lastUsefulPoint = null;
+            (double lat, double lon)? lastUsefulPointEdge = null;
+
+            int currentPointIndex = -1;
+            using (var enumerator = points.GetEnumerator())
+            {
+                while (enumerator.MoveNext())
+                {
+                    currentPointIndex++;
+                    if (lastUsefulPoint == null)
+                        lastUsefulPoint = enumerator.Current;
+                    else
+                    {
+                        var point = enumerator.Current;
+                        var dist = ShortestDistanceBetweenPoints(lastUsefulPoint, point);
+                        if (dist.HasValue)
+                        {
+                            distance += dist.Value.dist;
+                            if (lastUsefulPointEdge != null)
+                                distance += GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
+                                    dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
+                            lastUsefulPoint = point;
+                            lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
+                        }
+                    }
+                }
+                return (uint)distance;
+            }
         }
 
         private static (double dist, double p1EdgeLat, double p1EdgeLon, double p2EdgeLat, double p2EdgeLon)?
@@ -98,12 +207,12 @@ namespace MapDataServer.Services
             if (distanceBetweenEdges < 0)
                 return null;
 
-            var p1RadiusFactor = distanceBetweenCenters / p1.RangeRadius;
-            var p2RadiusFactor = distanceBetweenCenters / p2.RangeRadius;
+            var p1RadiusFactor = p1.RangeRadius / distanceBetweenCenters;
+            var p2RadiusFactor = p2.RangeRadius / distanceBetweenCenters;
             var p1EdgeLat = p1.Latitude + (p2.Latitude - p1.Latitude) * p1RadiusFactor;
             var p1EdgeLon = p1.Longitude + (p2.Longitude - p1.Longitude) * p1RadiusFactor;
-            var p2EdgeLat = p2.Latitude + (p1.Latitude - p2.Latitude) * p1RadiusFactor;
-            var p2EdgeLon = p2.Longitude + (p1.Longitude - p2.Longitude) * p1RadiusFactor;
+            var p2EdgeLat = p2.Latitude + (p1.Latitude - p2.Latitude) * p2RadiusFactor;
+            var p2EdgeLon = p2.Longitude + (p1.Longitude - p2.Longitude) * p2RadiusFactor;
             return (distanceBetweenEdges, p1EdgeLat, p1EdgeLon, p2EdgeLat, p2EdgeLon);
         }
 

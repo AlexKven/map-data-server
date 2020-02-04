@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace MapDataServer.Controllers
@@ -103,11 +104,71 @@ namespace MapDataServer.Controllers
             return point;
         }
 
-        [HttpGet("preprocessTrip")]
-        public async Task<ActionResult> PreprocessTrip([FromQuery] long tripId)
+        [HttpGet("tripSummary")]
+        public async Task<ActionResult> TripSummary([FromQuery] long tripId)
         {
+            var preprocessed = await Database.PreprocessedTrips.Where(trip => trip.Id == tripId).ToArrayAsync();
+            if (preprocessed.Any())
+                return new JsonResult(preprocessed[0]);
             var result = await TripPreprocessor.PreprocessTrip(tripId);
             return new JsonResult(result);
+        }
+
+        [HttpGet("activitySummary")]
+        public async Task<ActionResult> ActivitySummary([FromQuery] DateTime startTime, [FromQuery] DateTime endTime)
+        {
+            if (startTime > endTime)
+                return BadRequest();
+            if (endTime - startTime > TimeSpan.FromDays(366))
+                return BadRequest();
+
+            var hovTypesCount = Enum.GetValues(typeof(HovStatus)).Length;
+            uint[] distances = new uint[hovTypesCount];
+            TimeSpan[] times = new TimeSpan[hovTypesCount];
+
+            DateTime beginTime = DateTime.UtcNow;
+            var trips = await (from trip in Database.Trips
+                         where trip.StartTime >= startTime &&
+                                trip.EndTime < endTime
+                         select trip).ToArrayAsync();
+
+            foreach (var trip in trips)
+            {
+                var preprocessed = await Database.PreprocessedTrips.Where(processed => processed.Id == trip.Id).FirstOrDefaultAsync();
+                if (preprocessed == null)
+                    preprocessed = await TripPreprocessor.PreprocessTrip(trip.Id);
+                if (preprocessed == null)
+                    continue;
+                var hovStatus = trip.HovStatus;
+                if (hovStatus <= HovStatus.Motorcycle && await Database.ObaTripLinks.AnyAsync(oba => oba.MapTripId == trip.Id))
+                    hovStatus = HovStatus.Transit;
+                distances[(int)hovStatus] += preprocessed.DistanceMeters;
+                times[(int)hovStatus] += (preprocessed.ActualEndTime - preprocessed.ActualStartTime);
+            }
+
+            var totalDistance = distances.Sum(val => val);
+            var totalTime = TimeSpan.FromMilliseconds(times.Sum(val => val.TotalMilliseconds));
+
+            var resultBuilder = new StringBuilder();
+
+            resultBuilder.AppendLine($"Total distance: {totalDistance} meters");
+            resultBuilder.AppendLine($"Total time: {totalTime}");
+            resultBuilder.AppendLine();
+
+            for (int i = 0; i < hovTypesCount; i++)
+            {
+                var distance = distances[i];
+                var distFraction = (double)distance / (double)totalDistance;
+                var time = times[i];
+                var timeFraction = time / totalTime;
+                resultBuilder.AppendLine($"For {(HovStatus)i}:");
+                resultBuilder.AppendLine($"Distance: {distance} meters ({distFraction.ToString("P")})");
+                resultBuilder.AppendLine($"Time: {time} ({timeFraction.ToString("P")})");
+                resultBuilder.AppendLine();
+            }
+
+            resultBuilder.AppendLine($"Server time: {DateTime.UtcNow - beginTime}");
+            return new OkObjectResult(resultBuilder.ToString());
         }
     }
 }

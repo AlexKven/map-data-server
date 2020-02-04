@@ -41,6 +41,8 @@ namespace MapDataServer.Services
 
         public ITable<Trip> Trips => GetTable<Trip>();
 
+        public ITable<PreprocessedTrip> PreprocessedTrips => GetTable<PreprocessedTrip>();
+
         public ITable<TripPoint> TripPoints => GetTable<TripPoint>();
 
         public ITable<ObaTripLink> ObaTripLinks => GetTable<ObaTripLink>();

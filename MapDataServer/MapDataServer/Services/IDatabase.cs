@@ -20,6 +20,7 @@ namespace MapDataServer.Services
         ITable<MapHighway> MapHighways { get; }
         ITable<WayNodeLink> WayNodeLinks { get; }
         ITable<Trip> Trips { get; }
+        ITable<PreprocessedTrip> PreprocessedTrips { get; }
         ITable<TripPoint> TripPoints { get; }
         ITable<ObaTripLink> ObaTripLinks { get; }
         Task Initializer { get; }
