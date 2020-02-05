@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MapDataServer.Services
@@ -16,7 +17,7 @@ namespace MapDataServer.Services
             Database = database;
         }
 
-        public async Task<PreprocessedTrip> PreprocessTrip(long tripId)
+        public async Task<PreprocessedTrip> PreprocessTrip(long tripId, CancellationToken cancellationToken)
         {
             await Database.Initializer;
 
@@ -24,13 +25,13 @@ namespace MapDataServer.Services
             var points = await (from point in Database.TripPoints
                                 where point.TripId == tripId
                                 orderby point.Time ascending
-                                select point).ToListAsync();
+                                select point).ToListAsync(cancellationToken);
 
             DeDupe(points, duplicates);
 
             foreach (var point in duplicates)
             {
-                await Database.DeleteAsync(point);
+                await Database.DeleteAsync(point, token: cancellationToken);
             }
             duplicates.Clear();
 
@@ -61,7 +62,7 @@ namespace MapDataServer.Services
 
             foreach (var point in pointsToUpdate)
             {
-                await Database.InsertOrReplaceAsync(point);
+                await Database.InsertOrReplaceAsync(point, token: cancellationToken);
             }
             pointsToUpdate.Clear();
 
@@ -77,7 +78,7 @@ namespace MapDataServer.Services
 
             foreach (var point in pointsToUpdate)
             {
-                await Database.InsertOrReplaceAsync(point);
+                await Database.InsertOrReplaceAsync(point, token: cancellationToken);
             }
 
             DateTime actualStartTime;
@@ -92,7 +93,7 @@ namespace MapDataServer.Services
                 actualStartTime = actualEndTime = points.First().Time;
             }
             else
-                actualStartTime = actualEndTime = (await Database.Trips.FirstAsync(t => t.Id == tripId)).StartTime;
+                actualStartTime = actualEndTime = (await Database.Trips.FirstAsync(t => t.Id == tripId, cancellationToken)).StartTime;
 
             var preprocessed = new PreprocessedTrip()
             {
@@ -101,7 +102,7 @@ namespace MapDataServer.Services
                 ActualEndTime = actualEndTime,
                 DistanceMeters = distance
             };
-            await Database.InsertOrReplaceAsync(preprocessed);
+            await Database.InsertOrReplaceAsync(preprocessed, token: cancellationToken);
             return preprocessed;
         }
 

@@ -33,20 +33,25 @@ namespace MapDataServer.Services
             }
         }
 
+        private IDatabase Database { get; }
         private ITripProcessorStatus TripProcessorStatus { get; }
+        private ITripPreprocessor TripPreprocessor { get; }
 
-        public TripProcessorService(ITripProcessorStatus tripProcessorStatus)
+        public TripProcessorService(IDatabase database, ITripProcessorStatus tripProcessorStatus, ITripPreprocessor tripPreprocessor)
         {
+            Database = database;
             TripProcessorStatus = tripProcessorStatus;
+            TripPreprocessor = tripPreprocessor;
         }
 
-        private TaskCompletionSource<bool> Stop()
+        private CancellationTokenSource TokenSource { get; set; }
+
+        private void Stop()
         {
             lock (PropertyLock)
             {
                 _Stopped = true;
-                _StopTaskSource = new TaskCompletionSource<bool>();
-                return _StopTaskSource;
+                TokenSource.Cancel();
             }
         }
 
@@ -55,25 +60,54 @@ namespace MapDataServer.Services
             lock (PropertyLock)
             {
                 _Stopped = false;
-                _StopTaskSource?.SetResult(true);
-                _StopTaskSource = null;
+                _StopTaskSource = new TaskCompletionSource<bool>();
             }
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            cancellationToken.Register(() => Stop());
+            if (TokenSource != null && !TokenSource.IsCancellationRequested)
+                TokenSource.Cancel();
+            TokenSource = new CancellationTokenSource();
+            var token = TokenSource.Token;
+            cancellationToken.Register(() => TokenSource.Cancel());
+
             Start();
             while (!Stopped)
             {
                 TripProcessorStatus.RunCount++;
-                await Task.Delay(TimeSpan.FromMinutes(1));
+                try
+                {
+                    var trips = await Database.Trips.ToAsyncEnumerable().Select(t => t.Id).ToList(token);
+                    var preprocessed = await Database.PreprocessedTrips.ToAsyncEnumerable().Select(t => t.Id).ToList(token);
+                    foreach (var t in preprocessed)
+                    {
+                        trips.Remove(t);
+                    }
+                    preprocessed = null;
+                    if (trips.Count == 0)
+                        await Task.Delay(TimeSpan.FromSeconds(15));
+                    else
+                    {
+                        for (int i = 0; i < trips.Count; i++)
+                        {
+                            await TripPreprocessor.PreprocessTrip(trips[i], token);
+                        }
+                    }
+
+                }
+                catch (Exception)
+                {
+
+                }
             }
+            StopTaskSource.TrySetResult(true);
         }
 
         public async Task StopAsync(CancellationToken cancellationToken)
         {
-            await Stop().Task;
+            Stop();
+            await StopTaskSource.Task;
         }
     }
 }

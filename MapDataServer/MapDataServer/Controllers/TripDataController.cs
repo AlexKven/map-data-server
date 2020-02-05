@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MapDataServer.Controllers
@@ -110,7 +111,7 @@ namespace MapDataServer.Controllers
             var preprocessed = await Database.PreprocessedTrips.Where(trip => trip.Id == tripId).ToArrayAsync();
             if (preprocessed.Any())
                 return new JsonResult(preprocessed[0]);
-            var result = await TripPreprocessor.PreprocessTrip(tripId);
+            var result = await TripPreprocessor.PreprocessTrip(tripId, CancellationToken.None);
             return new JsonResult(result);
         }
 
@@ -131,14 +132,14 @@ namespace MapDataServer.Controllers
                          where trip.StartTime >= startTime &&
                                 trip.EndTime < endTime
                          select trip).ToArrayAsync();
+            var preprocessedTripCount = 0;
 
             foreach (var trip in trips)
             {
                 var preprocessed = await Database.PreprocessedTrips.Where(processed => processed.Id == trip.Id).FirstOrDefaultAsync();
                 if (preprocessed == null)
-                    preprocessed = await TripPreprocessor.PreprocessTrip(trip.Id);
-                if (preprocessed == null)
                     continue;
+                preprocessedTripCount++;
                 var hovStatus = trip.HovStatus;
                 if (hovStatus <= HovStatus.Motorcycle && await Database.ObaTripLinks.AnyAsync(oba => oba.MapTripId == trip.Id))
                     hovStatus = HovStatus.Transit;
@@ -151,6 +152,8 @@ namespace MapDataServer.Controllers
 
             var resultBuilder = new StringBuilder();
 
+            resultBuilder.AppendLine($"Results from {preprocessedTripCount} out of {trips.Length} trips. Others pending preprocessing.");
+            resultBuilder.AppendLine();
             resultBuilder.AppendLine($"Total distance: {totalDistance} meters");
             resultBuilder.AppendLine($"Total time: {totalTime}");
             resultBuilder.AppendLine();
