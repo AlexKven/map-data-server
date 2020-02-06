@@ -78,7 +78,10 @@ namespace MapDataServer.Services
                 TripProcessorStatus.RunCount++;
                 try
                 {
-                    var trips = await Database.Trips.ToAsyncEnumerable().Select(t => t.Id).ToList(token);
+                    var now = DateTime.Now;
+                    var trips = await Database.Trips.ToAsyncEnumerable()
+                        .Where(t => t.EndTime.HasValue || (now - t.StartTime > TimeSpan.FromDays(1)))
+                        .Select(t => t.Id).ToList(token);
                     var preprocessed = await Database.PreprocessedTrips.ToAsyncEnumerable().Select(t => t.Id).ToList(token);
                     foreach (var t in preprocessed)
                     {
