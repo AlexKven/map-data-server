@@ -47,6 +47,14 @@ namespace MapDataServer.Services
 
         public ITable<ObaTripLink> ObaTripLinks => GetTable<ObaTripLink>();
 
+        public ITable<ObaTrip> ObaTrips => GetTable<ObaTrip>();
+
+        public ITable<ObaServicePeriod> ObaServicePeriods => GetTable<ObaServicePeriod>();
+
+        public ITable<ObaRoute> ObaRoutes => GetTable<ObaRoute>();
+
+        public ITable<ObaTripStopLink> ObaTripStopLinks => GetTable<ObaTripStopLink>();
+
         private async Task InitializeAsync()
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -126,6 +134,24 @@ namespace MapDataServer.Services
             if (!tableTypes.Contains("ObaTripLinks"))
             {
                 await this.CreateTableAsync<ObaTripLink>();
+            }
+            if (!tableTypes.Contains("ObaServicePeriods"))
+            {
+                await this.CreateTableAsync<ObaServicePeriod>();
+            }
+            if (!tableTypes.Contains("ObaTrips"))
+            {
+                await this.CreateTableAsync<ObaTrip>();
+                await this.ExecuteAsync("ALTER TABLE ObaTrips ADD INDEX ObaRouteId(ObaRouteId);");
+            }
+            if (!tableTypes.Contains("ObaRoutes"))
+            {
+                await this.CreateTableAsync<ObaRoute>();
+            }
+            if (!tableTypes.Contains("ObaTripStopLinks"))
+            {
+                await this.CreateTableAsync<ObaTripStopLink>();
+                await this.ExecuteAsync("ALTER TABLE ObaTripStopLinks ADD INDEX StopSequence(StopSequence);");
             }
         }
 

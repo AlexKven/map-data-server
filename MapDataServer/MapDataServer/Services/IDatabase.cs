@@ -23,6 +23,10 @@ namespace MapDataServer.Services
         ITable<PreprocessedTrip> PreprocessedTrips { get; }
         ITable<TripPoint> TripPoints { get; }
         ITable<ObaTripLink> ObaTripLinks { get; }
+        ITable<ObaTrip> ObaTrips { get; }
+        ITable<ObaServicePeriod> ObaServicePeriods { get; }
+        ITable<ObaRoute> ObaRoutes { get; }
+        ITable<ObaTripStopLink> ObaTripStopLinks { get; }
         Task Initializer { get; }
 
         Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false);
