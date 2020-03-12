@@ -37,6 +37,8 @@ namespace MapDataServer
             .AddSingleton<IMapDownloader, MapDownloader>()
             .AddSingleton<ITripProcessorStatus, TripProcessorStatus>()
             .AddSingleton<ITripPreprocessor, TripPreprocessor>()
+            .AddSingleton<ObaApi>()
+            .AddSingleton<ObaRepository>()
             .AddHostedService<TripProcessorService>()
             .AddHttpClient();
         }

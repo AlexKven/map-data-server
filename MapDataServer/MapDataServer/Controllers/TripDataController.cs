@@ -1,4 +1,5 @@
 ﻿using LinqToDB;
+using MapDataServer.Helpers;
 using MapDataServer.Models;
 using MapDataServer.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -98,9 +99,7 @@ namespace MapDataServer.Controllers
 
         private async Task<TripPoint> InsertPointAndGenerateId(TripPoint point)
         {
-            var idBytes = new byte[8];
-            new Random().NextBytes(idBytes);
-            point.Id = BitConverter.ToInt64(idBytes, 0);
+            point.Id = new Random().RandomLong();
             await Database.InsertAsync(point);
             return point;
         }

@@ -13,7 +13,7 @@ namespace MapDataServer.Models
         public long Id { get; set; }
 
         [Column(Name = nameof(EndTime)), DataType(LinqToDB.DataType.DateTime)]
-        public DateTime EndTime { get; set; }
+        public DateTime? EndTime { get; set; }
 
         [Column(Name = nameof(ObaAgencyId)), DataType("VARCHAR(10)")]
         public string ObaAgencyId { get; set; }

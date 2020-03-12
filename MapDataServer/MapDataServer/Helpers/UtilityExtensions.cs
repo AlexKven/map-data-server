@@ -32,5 +32,12 @@ namespace MapDataServer.Helpers
                 last = point;
             }
         }
+
+        public static long RandomLong(this Random random)
+        {
+            var bytes = new byte[8];
+            new Random().NextBytes(bytes);
+            return BitConverter.ToInt64(bytes, 0);
+        }
     }
 }

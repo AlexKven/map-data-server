@@ -21,14 +21,16 @@ namespace MapDataServer.Controllers
         private IHttpClientFactory HttpClientFactory { get; }
         private IMapDownloader MapDownloader { get; }
         private ITripProcessorStatus TripProcessorStatus { get; }
+        private ObaRepository ObaRepository { get; }
         public ValuesController(IDatabase database, IHttpClientFactory httpClientFactory, IMapDownloader mapDownloader,
-            IConfiguration configuration, ITripProcessorStatus tripProcessorStatus)
+            IConfiguration configuration, ITripProcessorStatus tripProcessorStatus, ObaRepository obaRepository)
             : base(configuration)
         {
             Database = database;
             HttpClientFactory = httpClientFactory;
             MapDownloader = mapDownloader;
             TripProcessorStatus = tripProcessorStatus;
+            ObaRepository = obaRepository;
         }
 
         // GET api/values
@@ -92,6 +94,14 @@ namespace MapDataServer.Controllers
         public async Task<ActionResult<string>> TripProcessorRuns()
         {
             return new OkObjectResult(TripProcessorStatus.RunCount);
+        }
+
+
+        [HttpGet("currentServicePeriod")]
+        public async Task<ActionResult<string>> CurrentServicePeriod([FromRoute] string agencyId)
+        {
+            await Database.Initializer;
+            return new OkObjectResult(await ObaRepository.GetCurrentServicePeriod(agencyId));
         }
 
         // GET api/values/5
