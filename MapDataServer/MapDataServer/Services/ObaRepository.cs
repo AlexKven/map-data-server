@@ -25,6 +25,7 @@ namespace MapDataServer.Services
             var now = DateTime.UtcNow;
             var random = new Random();
             var result = await (from period in Database.ObaServicePeriods
+                          where period.ObaAgencyId == agencyId
                           orderby period.EndTime descending select period)
                           .ToAsyncEnumerable().FirstOrDefault();
             if (result == null || (result.EndTime.HasValue && result.EndTime.Value < now))

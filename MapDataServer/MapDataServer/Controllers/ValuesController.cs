@@ -98,7 +98,7 @@ namespace MapDataServer.Controllers
 
 
         [HttpGet("currentServicePeriod")]
-        public async Task<ActionResult<string>> CurrentServicePeriod([FromRoute] string agencyId)
+        public async Task<ActionResult<string>> CurrentServicePeriod([FromQuery] string agencyId)
         {
             await Database.Initializer;
             return new OkObjectResult(await ObaRepository.GetCurrentServicePeriod(agencyId));
