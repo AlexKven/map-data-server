@@ -96,12 +96,19 @@ namespace MapDataServer.Controllers
             return new OkObjectResult(TripProcessorStatus.RunCount);
         }
 
-
         [HttpGet("currentServicePeriod")]
         public async Task<ActionResult<string>> CurrentServicePeriod([FromQuery] string agencyId)
         {
             await Database.Initializer;
             return new OkObjectResult(await ObaRepository.GetCurrentServicePeriod(agencyId));
+        }
+
+        [HttpGet("getStopCountForObaTrip")]
+        public async Task<IActionResult> GetStopCountForObaTrip([FromQuery] string tripId)
+        {
+            await Database.Initializer;
+            var stops = await ObaRepository.GetStopsForTrip(tripId);
+            return new OkObjectResult(stops.Count());
         }
 
         // GET api/values/5

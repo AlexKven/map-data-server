@@ -27,10 +27,16 @@ namespace MapDataServer.Models
         [Column(Name = nameof(ServiceId)), PrimaryKey, NotNull, DataType("VARCHAR(64)")]
         public string ServiceId { get; set; }
 
+        [Column(Name = nameof(ServiceDate)), NotNull, DataType(LinqToDB.DataType.Date)]
+        public DateTime ServiceDate { get; set; }
+
+        [Column(Name = nameof(TimeZone)), DataType("VARCHAR(64)")]
+        public string TimeZone { get; set; }
+
         [Column(Name = nameof(Shape)), DataType(LinqToDB.DataType.Text)]
         public string Shape { get; set; }
 
-        [Column(Name = nameof(ShapeLength)), DataType(LinqToDB.DataType.UInt16)]
-        public ushort ShapeLength { get; set; }
+        [Column(Name = nameof(ShapeLength)), DataType(LinqToDB.DataType.Int32)]
+        public int ShapeLength { get; set; }
     }
 }

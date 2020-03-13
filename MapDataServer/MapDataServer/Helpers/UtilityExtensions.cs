@@ -39,5 +39,17 @@ namespace MapDataServer.Helpers
             new Random().NextBytes(bytes);
             return BitConverter.ToInt64(bytes, 0);
         }
+
+        public static string ParseAgencyId(this string otherId)
+        {
+            if (string.IsNullOrEmpty(otherId))
+                return null;
+            var parts = otherId.Split('_');
+            if (parts.Length < 2)
+                return null;
+            if (string.IsNullOrEmpty(parts[0]))
+                return null;
+            return parts[0];
+        }
     }
 }
