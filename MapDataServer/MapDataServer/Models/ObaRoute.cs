@@ -26,7 +26,7 @@ namespace MapDataServer.Models
         public string Description { get; set; }
 
         [Column(Name = nameof(Type)), DataType(LinqToDB.DataType.Byte)]
-        public string Type { get; set; }
+        public byte Type { get; set; }
 
         [Column(Name = nameof(Url)), DataType("VARCHAR(64)")]
         public string Url { get; set; }

@@ -94,5 +94,33 @@ namespace MapDataServer.Services
             }
             await Database.InsertOrReplaceAsync(dbTrip);
         }
+
+        public async Task<ObaRoute> GetRoute(string routeId)
+        {
+            var agencyId = routeId.ParseAgencyId();
+            var servicePeriod = await GetCurrentServicePeriod(agencyId);
+            var result = await (from route in Database.ObaRoutes
+                where route.ObaRouteId == routeId &&
+                route.ObaServicePeriodId == servicePeriod.Id
+                select route).ToAsyncEnumerable().FirstOrDefault();
+            if (result != null)
+                return result;
+
+            var obaRoute = (await ObaApi.GetRoute(routeId, CancellationToken.None)).Data;
+            var dbRoute = new ObaRoute()
+            {
+                Color = obaRoute.Color,
+                Description = obaRoute.Description,
+                LongName = obaRoute.LongName,
+                ObaRouteId = obaRoute.Id,
+                ObaServicePeriodId = servicePeriod.Id,
+                ShortName = obaRoute.ShortName,
+                TextColor = obaRoute.TextColor,
+                Type = obaRoute.Type,
+                Url = obaRoute.Url
+            };
+            await Database.InsertOrReplaceAsync(dbRoute);
+            return dbRoute;
+        }
     }
 }
