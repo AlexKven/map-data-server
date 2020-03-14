@@ -21,16 +21,43 @@ namespace MapDataServer.Services
             ObaApi = obaApi;
         }
 
-        public async Task<ObaServicePeriod> GetCurrentServicePeriod(string agencyId)
+        public Task<ObaServicePeriod> GetCurrentServicePeriod(string agencyId) =>
+            GetCurrentServicePeriod(agencyId, DateTime.Now);
+
+        public async Task<ObaServicePeriod> GetCurrentServicePeriod(string agencyId, DateTime now)
         {
             await Database.Initializer;
-            var now = DateTime.UtcNow;
             var random = new Random();
-            var result = await (from period in Database.ObaServicePeriods
-                          where period.ObaAgencyId == agencyId
-                          orderby period.EndTime descending select period)
-                          .ToAsyncEnumerable().FirstOrDefault();
-            if (result == null || (result.EndTime.HasValue && result.EndTime.Value < now))
+            ObaServicePeriod result = null;
+            using (var results = (from period in Database.ObaServicePeriods
+                                  where period.ObaAgencyId == agencyId &&
+                                  period.EndTime != null
+                                  orderby period.EndTime descending
+                                  select period)
+                          .ToAsyncEnumerable().GetEnumerator())
+            {
+                // Check latest service period that applies to current time
+                while (await results.MoveNext(CancellationToken.None))
+                {
+                    if (results.Current.EndTime > now)
+                    {
+                        result = results.Current;
+                        break;
+                    }
+                }
+            }
+
+            // If nothing, check if there is a null end time period
+            if (result == null)
+            {
+                result = await (from period in Database.ObaServicePeriods
+                                where period.ObaAgencyId == agencyId &&
+                                period.EndTime == null
+                                select period).ToAsyncEnumerable().FirstOrDefault();
+            }
+
+            // Still nothing, then time to create a new one
+            if (result == null)
             {
                 result = new ObaServicePeriod() { ObaAgencyId = agencyId, Id = random.RandomLong() };
                 await Database.InsertOrReplaceAsync(result);
