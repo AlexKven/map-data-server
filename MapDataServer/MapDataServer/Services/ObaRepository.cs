@@ -21,9 +21,6 @@ namespace MapDataServer.Services
             ObaApi = obaApi;
         }
 
-        public Task<ObaServicePeriod> GetCurrentServicePeriod(string agencyId) =>
-            GetCurrentServicePeriod(agencyId, DateTime.Now);
-
         public async Task<ObaServicePeriod> GetCurrentServicePeriod(string agencyId, DateTime now)
         {
             await Database.Initializer;
@@ -65,10 +62,10 @@ namespace MapDataServer.Services
             return result;
         }
 
-        public async Task<IEnumerable<ObaTripStopLink>> GetStopsForTrip(string tripId)
+        public async Task<IEnumerable<ObaTripStopLink>> GetStopsForTrip(string tripId, DateTime now)
         {
             var agencyId = tripId.ParseAgencyId();
-            var servicePeriod = await GetCurrentServicePeriod(agencyId);
+            var servicePeriod = await GetCurrentServicePeriod(agencyId, now);
             if (!(await Database.ObaTrips.AnyAsync(t =>
                 t.ObaServicePeriodId == servicePeriod.Id &&
                 t.ObaTripId == tripId)))
@@ -122,10 +119,10 @@ namespace MapDataServer.Services
             await Database.InsertOrReplaceAsync(dbTrip);
         }
 
-        public async Task<ObaRoute> GetRoute(string routeId)
+        public async Task<ObaRoute> GetRoute(string routeId, DateTime now)
         {
             var agencyId = routeId.ParseAgencyId();
-            var servicePeriod = await GetCurrentServicePeriod(agencyId);
+            var servicePeriod = await GetCurrentServicePeriod(agencyId, now);
             var result = await (from route in Database.ObaRoutes
                 where route.ObaRouteId == routeId &&
                 route.ObaServicePeriodId == servicePeriod.Id
