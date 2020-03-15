@@ -9,6 +9,7 @@
     <Import_RootNamespace>ClientServerShared</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Models\ActivitySummary.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\HovStatus.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\PaginatedResponse.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\PaginatedResponseAndSummary.cs" />
