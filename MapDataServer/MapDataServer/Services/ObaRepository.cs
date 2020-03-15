@@ -78,13 +78,28 @@ namespace MapDataServer.Services
                     select link).ToAsyncEnumerable().ToArray();
         }
 
-        private async Task DownloadTrip(string tripId, ObaServicePeriod servicePeriod)
+        public async Task<ObaTrip> GetTrip(string tripId, DateTime now)
         {
-            var obaTrip = (await ObaApi.GetTrip(tripId, CancellationToken.None)).Data;
-            var obaTripDetails = (await ObaApi.GetTripDetails(tripId, CancellationToken.None)).Data;
+            var agencyId = tripId.ParseAgencyId();
+            var servicePeriod = await GetCurrentServicePeriod(agencyId, now);
+            var result = await (from trip in Database.ObaTrips
+                          where trip.ObaTripId == tripId &&
+                          trip.ObaServicePeriodId == servicePeriod.Id
+                          select trip).ToAsyncEnumerable().FirstOrDefault();
+            return result ?? await DownloadTrip(tripId, servicePeriod);
+        }
+
+        private async Task<ObaTrip> DownloadTrip(string tripId, ObaServicePeriod servicePeriod)
+        {
+            var obaTrip = (await ObaApi.GetTrip(tripId, CancellationToken.None))?.Data;
+            if (obaTrip == null)
+                return null;
+            var obaTripDetails = (await ObaApi.GetTripDetails(tripId, CancellationToken.None))?.Data;
+            if (obaTripDetails == null)
+                return null;
             EncodedPolyline obaShape = null;
             if (obaTrip.ShapeId != null)
-                obaShape = (await ObaApi.GetShape(obaTrip.ShapeId, CancellationToken.None)).Data;
+                obaShape = (await ObaApi.GetShape(obaTrip.ShapeId, CancellationToken.None))?.Data;
 
             var dbTrip = new ObaTrip()
             {
@@ -117,6 +132,7 @@ namespace MapDataServer.Services
                 index++;
             }
             await Database.InsertOrReplaceAsync(dbTrip);
+            return dbTrip;
         }
 
         public async Task<ObaRoute> GetRoute(string routeId, DateTime now)
@@ -130,7 +146,9 @@ namespace MapDataServer.Services
             if (result != null)
                 return result;
 
-            var obaRoute = (await ObaApi.GetRoute(routeId, CancellationToken.None)).Data;
+            var obaRoute = (await ObaApi.GetRoute(routeId, CancellationToken.None))?.Data;
+            if (obaRoute == null)
+                return null;
             var dbRoute = new ObaRoute()
             {
                 Color = obaRoute.Color,

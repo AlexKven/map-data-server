@@ -14,6 +14,16 @@ namespace MapDataServer.Helpers
 
         public static long ToEpochMilliseconds(DateTime time) => (long)(time - Epoch).TotalMilliseconds;
 
+        public static DateTime GetLocalTimeForUtcTime(string timeZone, DateTime utcTime)
+        {
+            var tzdb = DateTimeZoneProviders.Tzdb;
+
+            var zone1 = tzdb[timeZone];
+            var instant = Instant.FromUnixTimeTicks(utcTime.Ticks);
+            var offset = zone1.GetUtcOffset(instant);
+            return utcTime + offset.ToTimeSpan();
+        }
+
         public static DateTime GetUtcStartOfDayForTimeZone(string timeZone, DateTime serviceDay)
         {
             // Thanks to https://stackoverflow.com/a/15213447/6706737

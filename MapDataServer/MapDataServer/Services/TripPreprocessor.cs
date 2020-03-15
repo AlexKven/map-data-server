@@ -1,5 +1,7 @@
 ﻿using LinqToDB;
+using MapDataServer.Helpers;
 using MapDataServer.Models;
+using MapDataServer.Utility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,9 +14,11 @@ namespace MapDataServer.Services
     public class TripPreprocessor : ITripPreprocessor
     {
         private IDatabase Database { get; }
-        public TripPreprocessor(IDatabase database)
+        private ObaRepository ObaRepository { get; }
+        public TripPreprocessor(IDatabase database, ObaRepository obaRepository)
         {
             Database = database;
+            ObaRepository = obaRepository;
         }
 
         public async Task<PreprocessedTrip> PreprocessTrip(long tripId, CancellationToken cancellationToken)
@@ -67,7 +71,7 @@ namespace MapDataServer.Services
             pointsToUpdate.Clear();
 
             var result = new PreprocessedTrip();
-            var usefulPoints = points.Skip(startTailPointsCount).Take(total - startTailPointsCount - endTailPointsCount);
+            var usefulPoints = points.Skip(startTailPointsCount).Take(total - startTailPointsCount - endTailPointsCount).ToArray();
             foreach (var pt in usefulPoints)
             {
                 pt.IsTailPoint = false;
@@ -95,6 +99,25 @@ namespace MapDataServer.Services
             else
                 actualStartTime = actualEndTime = (await Database.Trips.FirstAsync(t => t.Id == tripId, cancellationToken)).StartTime;
 
+
+            var obaTripLink = await (from link in Database.ObaTripLinks
+                                     where link.MapTripId == tripId
+                                     select link).FirstOrDefaultAsync();
+
+            if (obaTripLink != null && usefulPoints.Length > 0)
+            {
+                var calculator = new DelayCalculator(ObaRepository, obaTripLink.ObaTripId, actualStartTime);
+                if (await calculator.Initialize())
+                {
+                    foreach (var point in usefulPoints)
+                    {
+                        var obaPoint = calculator.CreateObaTripPointLink(point);
+                        if (obaPoint != null)
+                            await Database.InsertOrReplaceAsync(obaPoint);
+                    }
+                }
+            }
+
             var preprocessed = new PreprocessedTrip()
             {
                 Id = tripId,
@@ -102,7 +125,21 @@ namespace MapDataServer.Services
                 ActualEndTime = actualEndTime,
                 DistanceMeters = distance
             };
+            if (usefulPoints.Length > 0)
+            {
+                var startLat = usefulPoints[0].Latitude;
+                var startLon = usefulPoints[0].Longitude;
+                var endLat = usefulPoints[usefulPoints.Length - 1].Latitude;
+                var endLon = usefulPoints[usefulPoints.Length - 1].Longitude;
+                preprocessed.StartLatitude = startLat;
+                preprocessed.StartLongitude = startLon;
+                preprocessed.StartRegion = MapRegion.GetRegionContaining(startLat, startLon);
+                preprocessed.EndLatitude = endLat;
+                preprocessed.EndLongitude = endLon;
+                preprocessed.EndRegion = MapRegion.GetRegionContaining(endLat, endLon);
+            }
             await Database.InsertOrReplaceAsync(preprocessed, token: cancellationToken);
+
             return preprocessed;
         }
 
@@ -154,7 +191,7 @@ namespace MapDataServer.Services
                         {
                             distance += dist.Value.dist;
                             if (lastUsefulPointEdge != null)
-                                distance += GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
+                                distance += GeometryHelpers.GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
                                     dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
                             lastUsefulPoint = point;
                             lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
@@ -189,7 +226,7 @@ namespace MapDataServer.Services
                         {
                             distance += dist.Value.dist;
                             if (lastUsefulPointEdge != null)
-                                distance += GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
+                                distance += GeometryHelpers.GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
                                     dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
                             lastUsefulPoint = point;
                             lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
@@ -203,7 +240,7 @@ namespace MapDataServer.Services
         private static (double dist, double p1EdgeLat, double p1EdgeLon, double p2EdgeLat, double p2EdgeLon)?
             ShortestDistanceBetweenPoints(TripPoint p1, TripPoint p2)
         {
-            var distanceBetweenCenters = GetDistance(p1.Latitude, p1.Longitude, p2.Latitude, p2.Longitude);
+            var distanceBetweenCenters = GeometryHelpers.GetDistance(p1.Latitude, p1.Longitude, p2.Latitude, p2.Longitude);
             var distanceBetweenEdges = distanceBetweenCenters - p1.RangeRadius - p2.RangeRadius;
             if (distanceBetweenEdges < 0)
                 return null;
@@ -215,18 +252,6 @@ namespace MapDataServer.Services
             var p2EdgeLat = p2.Latitude + (p1.Latitude - p2.Latitude) * p2RadiusFactor;
             var p2EdgeLon = p2.Longitude + (p1.Longitude - p2.Longitude) * p2RadiusFactor;
             return (distanceBetweenEdges, p1EdgeLat, p1EdgeLon, p2EdgeLat, p2EdgeLon);
-        }
-
-        // Adapted from https://stackoverflow.com/a/51839058
-        public static double GetDistance(double latitude, double longitude, double otherLatitude, double otherLongitude)
-        {
-            var d1 = latitude * (Math.PI / 180.0);
-            var num1 = longitude * (Math.PI / 180.0);
-            var d2 = otherLatitude * (Math.PI / 180.0);
-            var num2 = otherLongitude * (Math.PI / 180.0) - num1;
-            var d3 = Math.Pow(Math.Sin((d2 - d1) / 2.0), 2.0) + Math.Cos(d1) * Math.Cos(d2) * Math.Pow(Math.Sin(num2 / 2.0), 2.0);
-
-            return 6376500.0 * (2.0 * Math.Atan2(Math.Sqrt(d3), Math.Sqrt(1.0 - d3)));
         }
     }
 }

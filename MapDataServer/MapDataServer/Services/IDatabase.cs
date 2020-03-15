@@ -27,6 +27,7 @@ namespace MapDataServer.Services
         ITable<ObaServicePeriod> ObaServicePeriods { get; }
         ITable<ObaRoute> ObaRoutes { get; }
         ITable<ObaTripStopLink> ObaTripStopLinks { get; }
+        ITable<ObaTripPointLink> ObaTripPointLinks { get; }
         Task Initializer { get; }
 
         Task BulkInsert<T>(IEnumerable<T> values, bool orReplace = false);
