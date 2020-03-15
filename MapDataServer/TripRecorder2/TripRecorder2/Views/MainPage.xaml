@@ -8,7 +8,7 @@
             x:Class="TripRecorder2.Views.MainPage">
 
     <TabbedPage.Children>
-        <NavigationPage Title="Trip">
+        <NavigationPage Title="Current Trip">
             <NavigationPage.Icon>
                 <OnPlatform x:TypeArguments="FileImageSource">
                     <On Platform="iOS" Value="tab_about.png"/>
@@ -18,14 +18,14 @@
                 <views:TripPage />
             </x:Arguments>
         </NavigationPage>
-        <NavigationPage Title="Settings">
+        <NavigationPage Title="Past Trips">
             <NavigationPage.Icon>
                 <OnPlatform x:TypeArguments="FileImageSource">
                     <On Platform="iOS" Value="tab_about.png"/>
                 </OnPlatform>
             </NavigationPage.Icon>
             <x:Arguments>
-                <views:SettingsPage />
+                <views:PastTripsPage />
             </x:Arguments>
         </NavigationPage>
         <NavigationPage Title="About">

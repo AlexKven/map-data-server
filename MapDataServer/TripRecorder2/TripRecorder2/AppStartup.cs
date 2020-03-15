@@ -25,6 +25,7 @@ namespace TripRecorder2
             builder.Register(cc => Container).As<IContainer>();
             builder.RegisterType<TripPagePointsListService>().SingleInstance();
             builder.RegisterType<TripPageViewModel>().SingleInstance();
+            builder.RegisterType<PastTripsPageViewModel>().SingleInstance();
             builder.RegisterType<TripSettingsProvider>().SingleInstance();
 
             try

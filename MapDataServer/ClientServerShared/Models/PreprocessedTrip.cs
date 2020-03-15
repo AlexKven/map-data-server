@@ -1,4 +1,6 @@
-﻿using LinqToDB.Mapping;
+﻿#if __SERVER__
+using LinqToDB.Mapping;
+#endif
 using System;
 using System.Collections.Generic;
 using System.Text;
