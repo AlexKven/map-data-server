@@ -172,5 +172,46 @@ namespace MapDataServer.Controllers
             resultBuilder.AppendLine($"Server time: {DateTime.UtcNow - beginTime}");
             return new OkObjectResult(resultBuilder.ToString());
         }
+
+        [HttpGet("tripsForTimeRange")]
+        public async Task<ActionResult> TripsForTimeRange(
+            [FromQuery] DateTime startTime, [FromQuery] DateTime endTime,
+            [FromQuery] int start = 0)
+        {
+            if (startTime > endTime)
+                return BadRequest();
+            if (endTime - startTime > TimeSpan.FromDays(2000))
+                return BadRequest();
+
+            var hovTypesCount = Enum.GetValues(typeof(HovStatus)).Length;
+            uint[] distances = new uint[hovTypesCount];
+            TimeSpan[] times = new TimeSpan[hovTypesCount];
+
+            var total = await (from trip in Database.Trips
+                              where trip.StartTime >= startTime &&
+                                     trip.EndTime < endTime
+                              select trip).CountAsync();
+            var fullQuery = from trip in Database.Trips
+                        join processed in Database.PreprocessedTrips
+                        on trip.Id equals processed.Id into p
+                        from processed in p.DefaultIfEmpty()
+                        where trip.StartTime >= startTime &&
+                               trip.EndTime < endTime
+                        orderby trip.StartTime ascending
+                        select new TripSummary(trip, processed);
+
+            var query = fullQuery.Skip(start).Take(100);
+
+            DateTime beginTime = DateTime.UtcNow;
+            var trips = await query.ToArrayAsync();
+
+            return new OkObjectResult(new PaginatedResponse<TripSummary>()
+            {
+                Total = total,
+                Count = trips.Length,
+                Start = start,
+                Items = trips
+            });
+        }
     }
 }

@@ -10,9 +10,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Models\HovStatus.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\PaginatedResponse.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\PaginatedResponseAndSummary.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\PreprocessedTrip.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\ObaTripPointLink.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\Trip.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Models\TripPoint.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Models\TripSummary.cs" />
   </ItemGroup>
 </Project>
