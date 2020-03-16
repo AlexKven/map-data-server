@@ -11,6 +11,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="auto"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="auto"/>
             </Grid.RowDefinitions>
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -26,16 +27,21 @@
                 <DatePicker Grid.Column="3" Date="{Binding EndDate, Mode=TwoWay}"/>
                 <Button Grid.Column="4" Text="Go!" Command="{Binding GoCommand}"/>
             </Grid>
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="1" IsVisible="{Binding ShowSummary}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="auto"/>
                 </Grid.RowDefinitions>
                 <chart:ChartView Grid.Row="0" Chart="{Binding DistanceChart}"/>
                 <chart:ChartView Grid.Row="1" Chart="{Binding TimeChart}"/>
                 <chart:ChartView Grid.Row="2" Chart="{Binding TripsChart}"/>
+                <Label Grid.Row="3" Text="{Binding InsignificantTripsLabel}"/>
             </Grid>
+            <ProgressBar VerticalOptions="StartAndExpand" HeightRequest="5" HorizontalOptions="FillAndExpand"
+                    Grid.Row="1" IsVisible="{Binding ShowProgress}" Progress="{Binding Progress}"/>
+            <Picker Grid.Row="2" ItemsSource="{Binding TripListItems}" SelectedIndex="{Binding SelectedItemIndex}"/>
         </Grid>
     </ContentPage.Content>
 </ContentPage>
