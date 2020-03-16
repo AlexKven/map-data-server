@@ -38,7 +38,7 @@
                     <Label.FormattedText>
                         <FormattedString>
                             <FormattedString.Spans>
-                                <Span Text="Trip Recorder II" FontAttributes="Bold" FontSize="22" />
+                                <Span Text="Trip Recorder" FontAttributes="Bold" FontSize="22" />
                                 <Span Text=" " />
                                 <Span Text="2.0" ForegroundColor="{StaticResource LightTextColor}" />
                             </FormattedString.Spans>

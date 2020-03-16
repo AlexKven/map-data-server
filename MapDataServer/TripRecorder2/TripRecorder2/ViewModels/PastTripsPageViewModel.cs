@@ -337,7 +337,7 @@ namespace TripRecorder2.ViewModels
                     if (result == null)
                         return;
                     total = result.Total;
-                    current = result.Count;
+                    current = result.Count + result.Start;
                     if (total == 0)
                         return;
                     Progress = (double)current / (double)total;
