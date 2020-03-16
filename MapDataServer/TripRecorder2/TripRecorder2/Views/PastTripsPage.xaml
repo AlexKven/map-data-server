@@ -32,16 +32,9 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <chart:ChartView Grid.Row="0" Grid.Column="0" x:Name="ModeChartDistance"/>
-                <chart:ChartView Grid.Row="0" Grid.Column="1" x:Name="DrivingChartDistance"/>
-                <chart:ChartView Grid.Row="1" Grid.Column="0" x:Name="ModeChartTime"/>
-                <chart:ChartView Grid.Row="1" Grid.Column="1" x:Name="DrivingChartTime"/>
-                <chart:ChartView Grid.Row="2" Grid.Column="0" x:Name="ModeChartTrips"/>
-                <chart:ChartView Grid.Row="2" Grid.Column="1" x:Name="DrivingChartTrips"/>
+                <chart:ChartView Grid.Row="0" Chart="{Binding DistanceChart}"/>
+                <chart:ChartView Grid.Row="1" Chart="{Binding TimeChart}"/>
+                <chart:ChartView Grid.Row="2" Chart="{Binding TripsChart}"/>
             </Grid>
         </Grid>
     </ContentPage.Content>
