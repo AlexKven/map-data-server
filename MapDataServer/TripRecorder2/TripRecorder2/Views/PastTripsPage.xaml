@@ -41,7 +41,7 @@
             </Grid>
             <ProgressBar VerticalOptions="StartAndExpand" HeightRequest="5" HorizontalOptions="FillAndExpand"
                     Grid.Row="1" IsVisible="{Binding ShowProgress}" Progress="{Binding Progress}"/>
-            <Picker Grid.Row="2" ItemsSource="{Binding TripListItems}" SelectedIndex="{Binding SelectedItemIndex}"/>
+            <Picker Grid.Row="2" ItemsSource="{Binding TripListItems}" SelectedIndex="{Binding SelectedItemIndex, Mode=TwoWay}"/>
         </Grid>
     </ContentPage.Content>
 </ContentPage>

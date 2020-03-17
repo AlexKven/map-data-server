@@ -49,6 +49,7 @@ namespace TripRecorder2.ViewModels
 
         private HttpClient HttpClient { get; } = new HttpClient();
 
+        #region Top-Level Views
         private bool _ShowProgress;
         public bool ShowProgress
         {
@@ -68,26 +69,6 @@ namespace TripRecorder2.ViewModels
         {
             get => _ShowSummary;
             set => SetProperty(ref _ShowSummary, value);
-        }
-
-        public ObservableRangeCollection<TripListItem> TripListItems { get; }
-            = new ObservableRangeCollection<TripListItem>();
-
-        private int _SelectedItemIndex = 0;
-        public int SelectedItemIndex
-        {
-            get => _SelectedItemIndex;
-            set
-            {
-                _SelectedItemIndex = value;
-                if (SelectedItemIndex == 1)
-                {
-                    LoadSummary(StartDate, EndDate);
-                    ShowSummary = true;
-                }
-                else
-                    ShowSummary = false;
-            }
         }
 
         private DateTime _StartDate;
@@ -114,6 +95,28 @@ namespace TripRecorder2.ViewModels
             }
         }
 
+        public ObservableRangeCollection<TripListItem> TripListItems { get; }
+            = new ObservableRangeCollection<TripListItem>();
+
+        private int _SelectedItemIndex = 0;
+        public int SelectedItemIndex
+        {
+            get => _SelectedItemIndex;
+            set
+            {
+                SetProperty(ref _SelectedItemIndex, value);
+                if (SelectedItemIndex == 1)
+                {
+                    LoadSummary(StartDate, EndDate);
+                    ShowSummary = true;
+                }
+                else
+                    ShowSummary = false;
+            }
+        }
+        #endregion
+
+        #region Activity Summary
         private Chart _DistanceChart;
         public Chart DistanceChart
         {
@@ -140,51 +143,6 @@ namespace TripRecorder2.ViewModels
         {
             get => _InsignificantTripsLabel;
             set => SetProperty(ref _InsignificantTripsLabel, value);
-        }
-
-        private string FormatDate(DateTime dateTime)
-        {
-            var utc = dateTime.ToUniversalTime();
-            return utc.ToString("s", CultureInfo.InvariantCulture);
-        }
-
-        private async Task<ActivitySummary> GetSummary(DateTime start, DateTime end, CancellationToken cancellationToken)
-        {
-            var url = $"{Config["server"]}/trip/activitySummary?startTime={FormatDate(start)}&endTime={FormatDate(end)}";
-            var request = new HttpRequestMessage();
-            request.RequestUri = new Uri(url);
-            try
-            {
-                var response = await HttpClient.SendAsync(request, cancellationToken);
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                    return null;
-                var content = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<ActivitySummary>(content);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-
-        private async Task<PaginatedResponse<TripSummary>> GetTripSummaries
-            (DateTime startTime, DateTime endTime, int start, CancellationToken cancellationToken)
-        {
-            var url = $"{Config["server"]}/trip/tripsForTimeRange?startTime={FormatDate(startTime)}&endTime={FormatDate(endTime)}&start={start}";
-            var request = new HttpRequestMessage();
-            request.RequestUri = new Uri(url);
-            try
-            {
-                var response = await HttpClient.SendAsync(request, cancellationToken);
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                    return null;
-                var content = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<PaginatedResponse<TripSummary>>(content);
-            }
-            catch (Exception)
-            {
-                return null;
-            }
         }
 
         private void DisplaySummary(ActivitySummary summary)
@@ -259,7 +217,56 @@ namespace TripRecorder2.ViewModels
             TripsChart = new DonutChart() { Entries = tripEntries };
             InsignificantTripsLabel = $"Excludes {summary.UnprocessedCount} unprocessed and {summary.InsignificantCount} zero-length trips.";
         }
+        #endregion
 
+        #region Downloading Data
+        private async Task<ActivitySummary> DownloadSummary(DateTime start, DateTime end, CancellationToken cancellationToken)
+        {
+            var url = $"{Config["server"]}/trip/activitySummary?startTime={FormatDate(start)}&endTime={FormatDate(end)}";
+            var request = new HttpRequestMessage();
+            request.RequestUri = new Uri(url);
+            try
+            {
+                var response = await HttpClient.SendAsync(request, cancellationToken);
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                    return null;
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<ActivitySummary>(content);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        private async Task<PaginatedResponse<TripSummary>> DownloadTripSummaries
+            (DateTime startTime, DateTime endTime, int start, CancellationToken cancellationToken)
+        {
+            var url = $"{Config["server"]}/trip/tripsForTimeRange?startTime={FormatDate(startTime)}&endTime={FormatDate(endTime)}&start={start}";
+            var request = new HttpRequestMessage();
+            request.RequestUri = new Uri(url);
+            try
+            {
+                var response = await HttpClient.SendAsync(request, cancellationToken);
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                    return null;
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<PaginatedResponse<TripSummary>>(content);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        private string FormatDate(DateTime dateTime)
+        {
+            var utc = dateTime.ToUniversalTime();
+            return utc.ToString("s", CultureInfo.InvariantCulture);
+        }
+        #endregion
+
+        #region Task Management
         private CancellationTokenSource RequestTokenSource { get; set; }
         private TaskCompletionSource<object> RequestTaskSource { get; set; }
 
@@ -274,7 +281,9 @@ namespace TripRecorder2.ViewModels
                 return null;
             return token;
         }
+        #endregion
 
+        #region Top-Level Tasks
         private async void LoadSummary(DateTime start, DateTime end)
         {
             try
@@ -302,7 +311,7 @@ namespace TripRecorder2.ViewModels
                 {
                     Progress = (current - start).TotalSeconds / (end - start).TotalSeconds;
                     current = next(current);
-                    var summary = await GetSummary(previous, current, token);
+                    var summary = await DownloadSummary(previous, current, token);
                     if (summary == null)
                         return;
                     currentSummary.AddSummary(summary);
@@ -327,13 +336,19 @@ namespace TripRecorder2.ViewModels
                 var token = wait.Value;
                 RequestTaskSource = new TaskCompletionSource<object>();
 
+                TripListItems.Clear();
+                SelectedItemIndex = -1;
+                TripListItems.Add(new TripListItem("Select an item", 0));
+                TripListItems.Add(new TripListItem("Activity summary", 0));
+                SelectedItemIndex = 0;
+
                 Progress = 0;
                 ShowProgress = true;
                 int current = 0;
                 int total;
                 do
                 {
-                    var result = await GetTripSummaries(start, end, current, token);
+                    var result = await DownloadTripSummaries(start, end, current, token);
                     if (result == null)
                         return;
                     total = result.Total;
@@ -355,13 +370,11 @@ namespace TripRecorder2.ViewModels
                 RequestTaskSource.SetResult(null);
             }
         }
+        #endregion
 
         private void Go()
         {
             SelectedItemIndex = 0;
-            TripListItems.Clear();
-            TripListItems.Add(new TripListItem("Select an item", 0));
-            TripListItems.Add(new TripListItem("Activity summary", 0));
             LoadTripsList(StartDate, EndDate);
         }
     }
