@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using Xamarin.Forms;
+using Xamarin.Forms.GoogleMaps;
 
 namespace TripRecorder2.ViewModels
 {
@@ -71,6 +72,13 @@ namespace TripRecorder2.ViewModels
             set => SetProperty(ref _ShowSummary, value);
         }
 
+        private bool _ShowMap = false;
+        public bool ShowMap
+        {
+            get => _ShowMap;
+            set => SetProperty(ref _ShowMap, value);
+        }
+
         private DateTime _StartDate;
         public DateTime StartDate
         {
@@ -112,6 +120,13 @@ namespace TripRecorder2.ViewModels
                 }
                 else
                     ShowSummary = false;
+                if (SelectedItemIndex > 1)
+                {
+                    LoadTrip(TripListItems[SelectedItemIndex].TripId);
+                    ShowMap = true;
+                }
+                else
+                    ShowMap = false;
             }
         }
         #endregion
@@ -219,6 +234,11 @@ namespace TripRecorder2.ViewModels
         }
         #endregion
 
+        #region Trip Map
+        public ObservableRangeCollection<Circle> TripPoints { get; }
+             = new ObservableRangeCollection<Circle>();
+        #endregion
+
         #region Downloading Data
         private async Task<ActivitySummary> DownloadSummary(DateTime start, DateTime end, CancellationToken cancellationToken)
         {
@@ -259,10 +279,23 @@ namespace TripRecorder2.ViewModels
             }
         }
 
-        private string FormatDate(DateTime dateTime)
+        private async Task<PaginatedResponse<TripPoint>> DownloadTripPoints(long tripId, int start, CancellationToken cancellationToken)
         {
-            var utc = dateTime.ToUniversalTime();
-            return utc.ToString("s", CultureInfo.InvariantCulture);
+            var url = $"{Config["server"]}/trip/pointsForTrip?tripId={tripId}&start={start}";
+            var request = new HttpRequestMessage();
+            request.RequestUri = new Uri(url);
+            try
+            {
+                var response = await HttpClient.SendAsync(request, cancellationToken);
+                if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                    return null;
+                var content = await response.Content.ReadAsStringAsync();
+                return JsonConvert.DeserializeObject<PaginatedResponse<TripPoint>>(content);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
         #endregion
 
@@ -370,12 +403,64 @@ namespace TripRecorder2.ViewModels
                 RequestTaskSource.SetResult(null);
             }
         }
+
+        private async void LoadTrip(long tripId)
+        {
+            try
+            {
+                var wait = await WaitForPreviousTask();
+                if (!wait.HasValue)
+                    return;
+                var token = wait.Value;
+                RequestTaskSource = new TaskCompletionSource<object>();
+
+                TripPoints.Clear();
+
+                Progress = 0;
+                ShowProgress = true;
+                int current = 0;
+                int total;
+                do
+                {
+                    var result = await DownloadTripPoints(tripId, current, token);
+                    if (result == null)
+                        return;
+                    total = result.Total;
+                    current = result.Count + result.Start;
+                    if (total == 0)
+                        return;
+                    Progress = (double)current / (double)total;
+                    foreach (var point in result.Items)
+                    {
+                        TripPoints.Add(new Circle()
+                        {
+                            Center = new Position(point.Latitude, point.Longitude),
+                            Radius = Distance.FromMeters(point.RangeRadius),
+                            FillColor = new Color(0, 0.2, 1, 0.25),
+                            StrokeColor = new Color(0, 0.2, 1, 0.75),
+                            StrokeWidth = 1
+                        });
+                    }
+                } while (current < total);
+            }
+            finally
+            {
+                ShowProgress = false;
+                RequestTaskSource.SetResult(null);
+            }
+        }
         #endregion
 
         private void Go()
         {
             SelectedItemIndex = 0;
             LoadTripsList(StartDate, EndDate);
+        }
+
+        private string FormatDate(DateTime dateTime)
+        {
+            var utc = dateTime.ToUniversalTime();
+            return utc.ToString("s", CultureInfo.InvariantCulture);
         }
     }
 }

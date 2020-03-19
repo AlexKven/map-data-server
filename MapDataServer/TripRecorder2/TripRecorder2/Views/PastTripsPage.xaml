@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:d="http://xamarin.com/schemas/2014/forms/design"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:views="clr-namespace:TripRecorder2.Views"
              mc:Ignorable="d"
              xmlns:chart="clr-namespace:Microcharts.Forms;assembly=Microcharts.Forms"
              x:Class="TripRecorder2.Views.PastTripsPage">
@@ -36,8 +37,11 @@
                 </Grid.RowDefinitions>
                 <chart:ChartView Grid.Row="0" Chart="{Binding DistanceChart}"/>
                 <chart:ChartView Grid.Row="1" Chart="{Binding TimeChart}"/>
-                <chart:ChartView Grid.Row="2" Chart="{Binding TripsChart}"/>
+                <chart:ChartView Grid.Row="2" Chart="{Binding TripPoints}"/>
                 <Label Grid.Row="3" Text="{Binding InsignificantTripsLabel}"/>
+            </Grid>
+            <Grid Grid.Row="1" IsVisible="{Binding ShowMap}">
+                <views:BindableMap CirclesSource="{Binding TripPoints}"/>
             </Grid>
             <ProgressBar VerticalOptions="StartAndExpand" HeightRequest="5" HorizontalOptions="FillAndExpand"
                     Grid.Row="1" IsVisible="{Binding ShowProgress}" Progress="{Binding Progress}"/>

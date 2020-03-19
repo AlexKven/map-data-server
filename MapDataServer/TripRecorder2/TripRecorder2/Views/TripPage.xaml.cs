@@ -65,7 +65,7 @@ namespace TripRecorder2.Views
             var p2 = LatLonToSquareCoords(47.6123821584, -122.199, x, y, zoom, 1024);
             canvas.Clear();
             canvas.DrawLine(p1.Item1, p1.Item2, p2.Item1, p2.Item2,
-                new SkiaSharp.SKPaint() { Color = new SkiaSharp.SKColor(255, 0, 0, 200), StrokeWidth = 30 });
+                new SkiaSharp.SKPaint() { Color = new SkiaSharp.SKColor(255, 0, 0, 175), StrokeWidth = 30 });
             canvas.Flush();
             canvas.Dispose();
 
