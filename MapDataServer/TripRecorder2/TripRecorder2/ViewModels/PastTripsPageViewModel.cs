@@ -3,6 +3,7 @@ using Microcharts;
 using Microsoft.Extensions.Configuration;
 using MvvmHelpers;
 using Newtonsoft.Json;
+using Plugin.Geolocator;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -13,6 +14,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using TripRecorder2.Services;
 using Xamarin.Forms;
 using Xamarin.Forms.GoogleMaps;
 
@@ -35,17 +37,21 @@ namespace TripRecorder2.ViewModels
     class PastTripsPageViewModel : BaseViewModel
     {
         private IConfiguration Config { get; }
+        private ILocationProvider LocationProvider { get; }
 
         public ICommand GoCommand { get; }
 
-        public PastTripsPageViewModel(IConfiguration config)
+        public PastTripsPageViewModel(IConfiguration config, ILocationProvider locationProvider)
         {
             Config = config;
+            LocationProvider = locationProvider;
 
             GoCommand = new Command(Go);
 
             StartDate = DateTime.Today - TimeSpan.FromDays(7);
             EndDate = DateTime.Today;
+
+            SetLocation();
         }
 
         private HttpClient HttpClient { get; } = new HttpClient();
@@ -237,6 +243,26 @@ namespace TripRecorder2.ViewModels
         #region Trip Map
         public ObservableRangeCollection<Circle> TripPoints { get; }
              = new ObservableRangeCollection<Circle>();
+
+        private Position _MapCenter;
+        public Position MapCenter
+        {
+            get => _MapCenter;
+            set => SetProperty(ref _MapCenter, value);
+        }
+
+        private async void SetLocation()
+        {
+            try
+            {
+                if (await LocationProvider.CheckPermission())
+                {
+                    var position = await CrossGeolocator.Current.GetPositionAsync(TimeSpan.FromSeconds(5));
+                    MapCenter = new Position(position.Latitude, position.Longitude);
+                }
+            }
+            catch (Exception) { }
+        }
         #endregion
 
         #region Downloading Data
@@ -432,12 +458,13 @@ namespace TripRecorder2.ViewModels
                     Progress = (double)current / (double)total;
                     foreach (var point in result.Items)
                     {
+                        var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
                         TripPoints.Add(new Circle()
                         {
                             Center = new Position(point.Latitude, point.Longitude),
                             Radius = Distance.FromMeters(point.RangeRadius),
-                            FillColor = new Color(0, 0.2, 1, 0.25),
-                            StrokeColor = new Color(0, 0.2, 1, 0.75),
+                            FillColor = new Color(0, 0.2, 1, 0.05 + 0.15 * distanceFactor),
+                            StrokeColor = new Color(0, 0.2, 1, 0.2 + 0.6 * distanceFactor),
                             StrokeWidth = 1
                         });
                     }

@@ -10,6 +10,51 @@ namespace TripRecorder2.Views
 {
     public class BindableMap : Map
     {
+        public BindableMap()
+        {
+            this.CameraIdled += BindableMap_CameraIdled;
+        }
+
+        private bool IsUpdatingCenter = false;
+        private void BindableMap_CameraIdled(object sender, CameraIdledEventArgs e)
+        {
+            if (IsUpdatingCenter)
+                return;
+            try
+            {
+                IsUpdatingCenter = true;
+                Center = e.Position.Target;
+            }
+            finally
+            {
+                IsUpdatingCenter = false;
+            }
+        }
+
+        public static readonly BindableProperty CenterProperty = BindableProperty.Create(
+            nameof(Center), typeof(Position), typeof(BindableMap), new Position(),
+            propertyChanged: (b, o, n) => ((BindableMap)b).OnCenterChanged((Position)n));
+        public Position Center
+        {
+            get => (Position)GetValue(CenterProperty);
+            set => SetValue(CenterProperty, value);
+        }
+
+        private void OnCenterChanged(Position newPosition)
+        {
+            if (IsUpdatingCenter)
+                return;
+            try
+            {
+                IsUpdatingCenter = true;
+                MoveCamera(CameraUpdateFactory.NewPosition(newPosition));
+            }
+            finally
+            {
+                IsUpdatingCenter = false;
+            }
+        }
+
         public static readonly BindableProperty CirclesSourceProperty = BindableProperty.Create(
             nameof(CirclesSource), typeof(IEnumerable<Circle>), typeof(BindableMap), null,
             propertyChanged: (b, o, n) =>
@@ -34,7 +79,7 @@ namespace TripRecorder2.Views
                 ncc1.CollectionChanged += OnCirclesSourceCollectionChanged;
             }
 
-
+            
         }
 
         private void OnCirclesSourceCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)

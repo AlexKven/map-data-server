@@ -27,6 +27,7 @@ namespace TripRecorder2.Droid
         private bool HasLocationPermission { get; set; }
 
         private bool PermissionResponded { get; set; }
+        private bool GettingPermission { get; set; } = false;
 
         protected override void OnCreate(Bundle savedInstanceState)
         {
@@ -71,14 +72,25 @@ namespace TripRecorder2.Droid
 
         internal async Task<bool> RequestLocationPermission()
         {
-            var permission = Manifest.Permission.AccessFineLocation;
+            try
+            {
+                if (!GettingPermission)
+                {
+                    GettingPermission = true;
+                    var permission = Manifest.Permission.AccessFineLocation;
 
-            PermissionResponded = false;
-            ActivityCompat.RequestPermissions(this, new string[] { permission }, PermissionRequestCode);
-            while (!PermissionResponded)
-                await Task.Delay(250);
+                    PermissionResponded = false;
+                    ActivityCompat.RequestPermissions(this, new string[] { permission }, PermissionRequestCode);
+                }
+                while (!PermissionResponded)
+                    await Task.Delay(250);
 
-            return HasLocationPermission;
+                return HasLocationPermission;
+            }
+            finally
+            {
+                GettingPermission = false;
+            }
         }
     }
 }

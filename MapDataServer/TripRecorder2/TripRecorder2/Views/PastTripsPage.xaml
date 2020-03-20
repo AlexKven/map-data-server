@@ -41,7 +41,7 @@
                 <Label Grid.Row="3" Text="{Binding InsignificantTripsLabel}"/>
             </Grid>
             <Grid Grid.Row="1" IsVisible="{Binding ShowMap}">
-                <views:BindableMap CirclesSource="{Binding TripPoints}"/>
+                <views:BindableMap CirclesSource="{Binding TripPoints}" Center="{Binding MapCenter}"/>
             </Grid>
             <ProgressBar VerticalOptions="StartAndExpand" HeightRequest="5" HorizontalOptions="FillAndExpand"
                     Grid.Row="1" IsVisible="{Binding ShowProgress}" Progress="{Binding Progress}"/>
