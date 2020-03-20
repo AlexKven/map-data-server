@@ -459,12 +459,15 @@ namespace TripRecorder2.ViewModels
                     foreach (var point in result.Items)
                     {
                         var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
+                        var baseColor = point.IsTailPoint.HasValue ?
+                            (point.IsTailPoint.Value ? Color.DarkGray : Color.DarkCyan)
+                            : Color.Red;
                         TripPoints.Add(new Circle()
                         {
                             Center = new Position(point.Latitude, point.Longitude),
                             Radius = Distance.FromMeters(point.RangeRadius),
-                            FillColor = new Color(0, 0.2, 1, 0.05 + 0.15 * distanceFactor),
-                            StrokeColor = new Color(0, 0.2, 1, 0.2 + 0.6 * distanceFactor),
+                            FillColor = baseColor.MultiplyAlpha(0.05 + 0.15 * distanceFactor),
+                            StrokeColor = baseColor.MultiplyAlpha(0.2 + 0.6 * distanceFactor),
                             StrokeWidth = 1
                         });
                     }
