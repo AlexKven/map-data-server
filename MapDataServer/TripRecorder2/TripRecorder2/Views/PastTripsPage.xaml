@@ -37,7 +37,7 @@
                 </Grid.RowDefinitions>
                 <chart:ChartView Grid.Row="0" Chart="{Binding DistanceChart}"/>
                 <chart:ChartView Grid.Row="1" Chart="{Binding TimeChart}"/>
-                <chart:ChartView Grid.Row="2" Chart="{Binding TripPoints}"/>
+                <chart:ChartView Grid.Row="2" Chart="{Binding TripsChart}"/>
                 <Label Grid.Row="3" Text="{Binding InsignificantTripsLabel}"/>
             </Grid>
             <Grid Grid.Row="1" IsVisible="{Binding ShowMap}">
