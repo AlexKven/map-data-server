@@ -244,8 +244,8 @@ namespace TripRecorder2.ViewModels
         #endregion
 
         #region Trip Map
-        private List<TripPoint> CurrentTripPoints { get; }
-            = new List<TripPoint>();
+        private List<(TripPoint, ObaTripPointLink)> CurrentTripPoints { get; }
+            = new List<(TripPoint, ObaTripPointLink)>();
         private List<GeometryHelpers.TripPointWithEdges> CurrentTripEdges { get; }
             = new List<GeometryHelpers.TripPointWithEdges>();
 
@@ -298,7 +298,7 @@ namespace TripRecorder2.ViewModels
             switch (SelectedMapViewItemIndex)
             {
                 case 0:
-                    foreach (var point in CurrentTripPoints)
+                    foreach (var point in CurrentTripPoints.Select(p => p.Item1))
                     {
                         var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
                         var baseColor = Color.Red;
@@ -445,9 +445,9 @@ namespace TripRecorder2.ViewModels
             }
         }
 
-        private async Task<PaginatedResponse<TripPoint>> DownloadTripPoints(long tripId, int start, CancellationToken cancellationToken)
+        private async Task<PaginatedResponse<(TripPoint, ObaTripPointLink)>> DownloadTripPoints(long tripId, int start, CancellationToken cancellationToken)
         {
-            var url = $"{Config["server"]}/trip/pointsForTrip?tripId={tripId}&start={start}";
+            var url = $"{Config["server"]}/trip/pointsForTrip?tripId={tripId}&start={start}&includeObaPoints=true";
             var request = new HttpRequestMessage();
             request.RequestUri = new Uri(url);
             try
@@ -456,7 +456,7 @@ namespace TripRecorder2.ViewModels
                 if (response.StatusCode != System.Net.HttpStatusCode.OK)
                     return null;
                 var content = await response.Content.ReadAsStringAsync();
-                return JsonConvert.DeserializeObject<PaginatedResponse<TripPoint>>(content);
+                return JsonConvert.DeserializeObject<PaginatedResponse<(TripPoint, ObaTripPointLink)>>(content);
             }
             catch (Exception)
             {
@@ -609,6 +609,7 @@ namespace TripRecorder2.ViewModels
                     CurrentTripPoints.AddRange(result.Items);
                     CurrentTripEdges.Clear();
                     GeometryHelpers.GetTotalLength(CurrentTripPoints
+                        .Select(p => p.Item1)
                         .Where(p => p.IsTailPoint == false), CurrentTripEdges);
                     SetTripMap();
                     Progress = (double)current / (double)total;

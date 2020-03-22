@@ -190,62 +190,61 @@ namespace MapDataServer.Controllers
             });
         }
 
+        private static (T1, T2) MakeTuple<T1, T2>(T1 item1, T2 item2) => (item1, item2);
+
         [HttpGet("pointsForTrip")]
-        public async Task<ActionResult> PointsForTrip([FromQuery] long tripId, [FromQuery] int start = 0)
+        public async Task<ActionResult> PointsForTrip([FromQuery] long tripId, [FromQuery] int start = 0,
+            [FromQuery] bool includeObaPoints = false)
         {
             var total = await (from point in Database.TripPoints
                                where point.TripId == tripId
                                select point).CountAsync();
-            var fullQuery = from point in Database.TripPoints
+            if (includeObaPoints)
+            {
+                //from trip in Database.Trips
+                //join processed in Database.PreprocessedTrips
+                //on trip.Id equals processed.Id into p
+                //from processed in p.DefaultIfEmpty()
+                //where trip.StartTime >= startTime &&
+                //       trip.EndTime < endTime
+                //orderby trip.StartTime ascending
+                //select new TripSummary(trip, processed);
+
+                var fullQuery = from point in Database.TripPoints
+                                where point.TripId == tripId
+                                join obaPoint in Database.ObaTripPointLinks
+                                on point.Id equals obaPoint.Id into p
+                                from obaPoint in p.DefaultIfEmpty()
+                                orderby point.Time ascending
+                                select MakeTuple(point, obaPoint);
+                var query = fullQuery.Skip(start).Take(100);
+                var points = await query.ToArrayAsync();
+
+                return new OkObjectResult(new PaginatedResponse<(TripPoint, ObaTripPointLink)>()
+                {
+                    Total = total,
+                    Count = points.Length,
+                    Start = start,
+                    Items = points
+                });
+            }
+            else
+            {
+                var fullQuery = from point in Database.TripPoints
                                 where point.TripId == tripId
                                 orderby point.Time ascending
                                 select point;
-            var query = fullQuery.Skip(start).Take(100);
-            var points = await query.ToArrayAsync();
+                var query = fullQuery.Skip(start).Take(100);
+                var points = await query.ToArrayAsync();
 
-            return new OkObjectResult(new PaginatedResponse<TripPoint>()
-            {
-                Total = total,
-                Count = points.Length,
-                Start = start,
-                Items = points
-            });
-        }
-
-        [HttpGet("obaPointsForTrip")]
-        public async Task<ActionResult> ObaPointsForTrip([FromQuery] long tripId, [FromQuery] int start = 0)
-        {
-            var obaTripId = await (from link in Database.ObaTripLinks
-                                   where link.MapTripId == tripId
-                                   select link.ObaTripId).FirstOrDefaultAsync();
-
-            // If true, this is not a (processed) transit trip
-            if (obaTripId == null)
-                return new OkObjectResult(new PaginatedResponse<ObaTripPointLink>()
+                return new OkObjectResult(new PaginatedResponse<TripPoint>()
                 {
-                    Total = 0,
-                    Count = 0,
-                    Start = 0,
-                    Items = new ObaTripPointLink[0]
+                    Total = total,
+                    Count = points.Length,
+                    Start = start,
+                    Items = points
                 });
-
-            var total = await (from point in Database.ObaTripPointLinks
-                               where point.ObaTripId == obaTripId
-                               select point).CountAsync();
-            var fullQuery = from point in Database.ObaTripPointLinks
-                            where point.ObaTripId == obaTripId
-                            orderby point.Time ascending
-                            select point;
-            var query = fullQuery.Skip(start).Take(100);
-            var points = await query.ToArrayAsync();
-
-            return new OkObjectResult(new PaginatedResponse<ObaTripPointLink>()
-            {
-                Total = total,
-                Count = points.Length,
-                Start = start,
-                Items = points
-            });
+            }
         }
     }
 }
