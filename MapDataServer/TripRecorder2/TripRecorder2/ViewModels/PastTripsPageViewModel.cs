@@ -1,4 +1,5 @@
-﻿using MapDataServer.Models;
+﻿using MapDataServer.Helpers;
+using MapDataServer.Models;
 using Microcharts;
 using Microsoft.Extensions.Configuration;
 using MvvmHelpers;
@@ -14,6 +15,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using TripRecorder2.Models;
 using TripRecorder2.Services;
 using Xamarin.Forms;
 using Xamarin.Forms.GoogleMaps;
@@ -241,8 +243,30 @@ namespace TripRecorder2.ViewModels
         #endregion
 
         #region Trip Map
+        private List<TripPoint> CurrentTripPoints { get; }
+            = new List<TripPoint>();
+
+        public IEnumerable<string> MapViewItems { get; } = new string[]
+        {
+            "Trip points", "Approximate trip path"
+        };
+
+        private int _SelectedMapViewItemIndex = 0;
+        public int SelectedMapViewItemIndex
+        {
+            get => _SelectedMapViewItemIndex;
+            set
+            {
+                SetProperty(ref _SelectedMapViewItemIndex, value);
+                SetTripMap();
+            }
+        }
+
         public ObservableRangeCollection<Circle> TripPoints { get; }
              = new ObservableRangeCollection<Circle>();
+
+        public HeatmapPolyline TripPolyline { get; }
+            = new HeatmapPolyline();
 
         private Position _MapCenter;
         public Position MapCenter
@@ -262,6 +286,54 @@ namespace TripRecorder2.ViewModels
                 }
             }
             catch (Exception) { }
+        }
+
+        private void SetTripMap()
+        {
+            TripPoints.Clear();
+            TripPolyline.Segments.Clear();
+            switch (SelectedMapViewItemIndex)
+            {
+                case 0:
+                    foreach (var point in CurrentTripPoints)
+                    {
+                        var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
+                        var baseColor = point.IsTailPoint.HasValue ?
+                            (point.IsTailPoint.Value ? Color.DarkGray : Color.DarkCyan)
+                            : Color.Red;
+                        TripPoints.Add(new Circle()
+                        {
+                            Center = new Position(point.Latitude, point.Longitude),
+                            Radius = Distance.FromMeters(point.RangeRadius),
+                            FillColor = baseColor.MultiplyAlpha(0.05 + 0.15 * distanceFactor),
+                            StrokeColor = baseColor.MultiplyAlpha(0.2 + 0.6 * distanceFactor),
+                            StrokeWidth = 1
+                        });
+                    }
+                    break;
+                case 1:
+                    List<GeometryHelpers.TripPointWithEdges> edges = new List<GeometryHelpers.TripPointWithEdges>();
+                    GeometryHelpers.GetTotalLength(CurrentTripPoints, edges);
+                    GeometryHelpers.TripPointWithEdges prev = null;
+                    foreach (var edge in edges)
+                    {
+                        if (prev != null)
+                        {
+                            if (prev.OutEdge.HasValue && edge.InEdge.HasValue)
+                                TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                                    new Position(prev.OutEdge.Value.lat, prev.OutEdge.Value.lon),
+                                    new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
+                                    0, 0));
+                            if (edge.InEdge.HasValue && edge.OutEdge.HasValue)
+                                TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                                    new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
+                                    new Position(edge.OutEdge.Value.lat, edge.OutEdge.Value.lon),
+                                    0, 0));
+                        }
+                        prev = edge;
+                    }
+                    break;
+            }
         }
         #endregion
 
@@ -322,6 +394,14 @@ namespace TripRecorder2.ViewModels
             {
                 return null;
             }
+        }
+        #endregion
+
+        #region Formatting
+        private string FormatDate(DateTime dateTime)
+        {
+            var utc = dateTime.ToUniversalTime();
+            return utc.ToString("s", CultureInfo.InvariantCulture);
         }
         #endregion
 
@@ -440,7 +520,7 @@ namespace TripRecorder2.ViewModels
                 var token = wait.Value;
                 RequestTaskSource = new TaskCompletionSource<object>();
 
-                TripPoints.Clear();
+                CurrentTripPoints.Clear();
 
                 Progress = 0;
                 ShowProgress = true;
@@ -455,22 +535,9 @@ namespace TripRecorder2.ViewModels
                     current = result.Count + result.Start;
                     if (total == 0)
                         return;
+                    CurrentTripPoints.AddRange(result.Items);
+                    SetTripMap();
                     Progress = (double)current / (double)total;
-                    foreach (var point in result.Items)
-                    {
-                        var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
-                        var baseColor = point.IsTailPoint.HasValue ?
-                            (point.IsTailPoint.Value ? Color.DarkGray : Color.DarkCyan)
-                            : Color.Red;
-                        TripPoints.Add(new Circle()
-                        {
-                            Center = new Position(point.Latitude, point.Longitude),
-                            Radius = Distance.FromMeters(point.RangeRadius),
-                            FillColor = baseColor.MultiplyAlpha(0.05 + 0.15 * distanceFactor),
-                            StrokeColor = baseColor.MultiplyAlpha(0.2 + 0.6 * distanceFactor),
-                            StrokeWidth = 1
-                        });
-                    }
                 } while (current < total);
             }
             finally
@@ -485,12 +552,6 @@ namespace TripRecorder2.ViewModels
         {
             SelectedItemIndex = 0;
             LoadTripsList(StartDate, EndDate);
-        }
-
-        private string FormatDate(DateTime dateTime)
-        {
-            var utc = dateTime.ToUniversalTime();
-            return utc.ToString("s", CultureInfo.InvariantCulture);
         }
     }
 }

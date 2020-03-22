@@ -78,7 +78,7 @@ namespace MapDataServer.Services
                 pointsToUpdate.Add(pt);
             }
 
-            var distance = GetTotalLength(usefulPoints);
+            var distance = GeometryHelpers.GetTotalLength(usefulPoints);
 
             foreach (var point in pointsToUpdate)
             {
@@ -186,7 +186,7 @@ namespace MapDataServer.Services
                     else
                     {
                         var point = enumerator.Current;
-                        var dist = ShortestDistanceBetweenPoints(lastUsefulPoint, point);
+                        var dist = GeometryHelpers.ShortestDistanceBetweenTripPoints(lastUsefulPoint, point);
                         if (dist.HasValue)
                         {
                             distance += dist.Value.dist;
@@ -204,54 +204,5 @@ namespace MapDataServer.Services
             }
         }
 
-        private static uint GetTotalLength(IEnumerable<TripPoint> points)
-        {
-            double distance = 0;
-            TripPoint lastUsefulPoint = null;
-            (double lat, double lon)? lastUsefulPointEdge = null;
-
-            int currentPointIndex = -1;
-            using (var enumerator = points.GetEnumerator())
-            {
-                while (enumerator.MoveNext())
-                {
-                    currentPointIndex++;
-                    if (lastUsefulPoint == null)
-                        lastUsefulPoint = enumerator.Current;
-                    else
-                    {
-                        var point = enumerator.Current;
-                        var dist = ShortestDistanceBetweenPoints(lastUsefulPoint, point);
-                        if (dist.HasValue)
-                        {
-                            distance += dist.Value.dist;
-                            if (lastUsefulPointEdge != null)
-                                distance += GeometryHelpers.GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
-                                    dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
-                            lastUsefulPoint = point;
-                            lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
-                        }
-                    }
-                }
-                return (uint)distance;
-            }
-        }
-
-        private static (double dist, double p1EdgeLat, double p1EdgeLon, double p2EdgeLat, double p2EdgeLon)?
-            ShortestDistanceBetweenPoints(TripPoint p1, TripPoint p2)
-        {
-            var distanceBetweenCenters = GeometryHelpers.GetDistance(p1.Latitude, p1.Longitude, p2.Latitude, p2.Longitude);
-            var distanceBetweenEdges = distanceBetweenCenters - p1.RangeRadius - p2.RangeRadius;
-            if (distanceBetweenEdges < 0)
-                return null;
-
-            var p1RadiusFactor = p1.RangeRadius / distanceBetweenCenters;
-            var p2RadiusFactor = p2.RangeRadius / distanceBetweenCenters;
-            var p1EdgeLat = p1.Latitude + (p2.Latitude - p1.Latitude) * p1RadiusFactor;
-            var p1EdgeLon = p1.Longitude + (p2.Longitude - p1.Longitude) * p1RadiusFactor;
-            var p2EdgeLat = p2.Latitude + (p1.Latitude - p2.Latitude) * p2RadiusFactor;
-            var p2EdgeLon = p2.Longitude + (p1.Longitude - p2.Longitude) * p2RadiusFactor;
-            return (distanceBetweenEdges, p1EdgeLat, p1EdgeLon, p2EdgeLat, p2EdgeLon);
-        }
     }
 }
