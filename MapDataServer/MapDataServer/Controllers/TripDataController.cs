@@ -201,15 +201,6 @@ namespace MapDataServer.Controllers
                                select point).CountAsync();
             if (includeObaPoints)
             {
-                //from trip in Database.Trips
-                //join processed in Database.PreprocessedTrips
-                //on trip.Id equals processed.Id into p
-                //from processed in p.DefaultIfEmpty()
-                //where trip.StartTime >= startTime &&
-                //       trip.EndTime < endTime
-                //orderby trip.StartTime ascending
-                //select new TripSummary(trip, processed);
-
                 var fullQuery = from point in Database.TripPoints
                                 where point.TripId == tripId
                                 join obaPoint in Database.ObaTripPointLinks

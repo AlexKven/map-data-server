@@ -114,31 +114,38 @@ namespace TripRecorder2.Models
             {
                 for (int i = 0; i < validLevels.Count; i++)
                 {
-                    if (validLevels[i].Threshold < start)
-                    {
-                        if (i < validLevels.Count - 1 && validLevels[i + 1].Threshold > start)
-                        {
-                            var diff = validLevels[i + 1].Threshold - validLevels[i].Threshold;
-                            var factor = (start - validLevels[i].Threshold) / diff;
-                            yield return new HeatmapPolylineGradientLevel(0,
-                                MoveColorToward(validLevels[i].Color, validLevels[i + 1].Color, factor));
-                        }
-                    }
-                    else if (validLevels[i].Threshold > end)
-                    {
-                        if (i > 0 && validLevels[i - 1].Threshold < end)
-                        {
-                            var diff = validLevels[i].Threshold - validLevels[i - 1].Threshold;
-                            var factor = (end - validLevels[i - 1].Threshold) / diff;
-                            yield return new HeatmapPolylineGradientLevel(1,
-                                MoveColorToward(validLevels[i - 1].Color, validLevels[i].Color, factor));
-                        }
-                    }
+                    if (i == 0 && validLevels[i].Threshold > start)
+                        yield return new HeatmapPolylineGradientLevel(0, validLevels[i].Color);
+                    else if (i == validLevels.Count - 1 && validLevels[i].Threshold < end)
+                        yield return new HeatmapPolylineGradientLevel(1, validLevels[i].Color);
                     else
                     {
-                        yield return new HeatmapPolylineGradientLevel(
-                            (validLevels[i].Threshold - start) / (end - start),
-                            validLevels[i].Color);
+                        if (validLevels[i].Threshold < start)
+                        {
+                            if (i < validLevels.Count - 1 && validLevels[i + 1].Threshold > start)
+                            {
+                                var diff = validLevels[i + 1].Threshold - validLevels[i].Threshold;
+                                var factor = (start - validLevels[i].Threshold) / diff;
+                                yield return new HeatmapPolylineGradientLevel(0,
+                                    MoveColorToward(validLevels[i].Color, validLevels[i + 1].Color, factor));
+                            }
+                        }
+                        else if (validLevels[i].Threshold > end)
+                        {
+                            if (i > 0 && validLevels[i - 1].Threshold < end)
+                            {
+                                var diff = validLevels[i].Threshold - validLevels[i - 1].Threshold;
+                                var factor = (end - validLevels[i - 1].Threshold) / diff;
+                                yield return new HeatmapPolylineGradientLevel(1,
+                                    MoveColorToward(validLevels[i - 1].Color, validLevels[i].Color, factor));
+                            }
+                        }
+                        else
+                        {
+                            yield return new HeatmapPolylineGradientLevel(
+                                (validLevels[i].Threshold - start) / (end - start),
+                                validLevels[i].Color);
+                        }
                     }
                 }
             }

@@ -251,7 +251,7 @@ namespace TripRecorder2.ViewModels
 
         public IEnumerable<string> MapViewItems { get; } = new string[]
         {
-            "Trip points", "Approximate trip path"
+            "Trip points", "Approximate trip path", "OneBusAway trip point accuracy"
         };
 
         private int _SelectedMapViewItemIndex = 0;
@@ -293,113 +293,142 @@ namespace TripRecorder2.ViewModels
 
         private void SetTripMap()
         {
+            void drawTripPoints()
+            {
+                foreach (var point in CurrentTripPoints.Select(p => p.Item1))
+                {
+                    var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
+                    var baseColor = Color.Red;
+                    if (point.IsTailPoint.HasValue)
+                    {
+                        if (point.IsTailPoint.Value)
+                            baseColor = Color.DarkGray;
+                        else
+                        {
+                            if (CurrentTripEdges.Any(e => e.TripPoint == point))
+                                baseColor = Color.DarkCyan;
+                            else
+                                baseColor = Color.DarkOrange;
+                        }
+                    }
+                    TripPoints.Add(new Circle()
+                    {
+                        Center = new Position(point.Latitude, point.Longitude),
+                        Radius = Distance.FromMeters(point.RangeRadius),
+                        FillColor = baseColor.MultiplyAlpha(0.05 + 0.15 * distanceFactor),
+                        StrokeColor = baseColor.MultiplyAlpha(0.2 + 0.6 * distanceFactor),
+                        StrokeWidth = 1
+                    });
+                }
+            }
+            void drawTripPath()
+            {
+                TripPolyline.GradientLevels.Clear();
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.Green));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(11.175, Color.YellowGreen));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(22.35, Color.Goldenrod));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(35.76, Color.Red));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(89.4, Color.Black));
+
+                for (int i = 0; i < CurrentTripEdges.Count; i++)
+                {
+                    var edge = CurrentTripEdges[i];
+                    var prev = i > 0 ? CurrentTripEdges[i - 1] : null;
+
+                    (double lat, double lon)? p0 = null;
+                    (double lat, double lon)? p1 = null;
+                    (double lat, double lon)? p2 = null;
+                    (double lat, double lon)? p3 = null;
+                    (double lat, double lon)? p4 = null;
+                    (double lat, double lon)? p5 = null;
+
+                    if (prev?.InEdge != null)
+                        p0 = (prev.InEdge.Value.lat, prev.InEdge.Value.lon);
+                    if (prev?.OutEdge != null)
+                        p2 = (prev.OutEdge.Value.lat, prev.OutEdge.Value.lon);
+                    if (edge?.InEdge != null)
+                        p3 = (edge.InEdge.Value.lat, edge.InEdge.Value.lon);
+                    if (edge?.OutEdge != null)
+                        p5 = (edge.OutEdge.Value.lat, edge.OutEdge.Value.lon);
+
+                    if (p0.HasValue && p2.HasValue)
+                        p1 = ((p0.Value.lat + p2.Value.lat) / 2, (p0.Value.lon + p2.Value.lon) / 2);
+                    if (p3.HasValue && p5.HasValue)
+                        p4 = ((p3.Value.lat + p5.Value.lat) / 2, (p3.Value.lon + p5.Value.lon) / 2);
+
+                    double dist = 0;
+                    if (p1.HasValue && p2.HasValue && p3.HasValue && p4.HasValue)
+                    {
+                        dist = GeometryHelpers.GetDistance(p1.Value, p2.Value) +
+                            GeometryHelpers.GetDistance(p2.Value, p3.Value) +
+                            GeometryHelpers.GetDistance(p3.Value, p4.Value);
+                    }
+                    double speed = 0;
+                    if (prev != null)
+                        speed = dist / (edge.TripPoint.Time - prev.TripPoint.Time).TotalSeconds;
+
+                    if (p1.HasValue && p2.HasValue)
+                        TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                            new Position(p1.Value.lat, p1.Value.lon),
+                            new Position(p2.Value.lat, p2.Value.lon), speed, speed));
+                    if (p2.HasValue && p3.HasValue)
+                        TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                            new Position(p2.Value.lat, p2.Value.lon),
+                            new Position(p3.Value.lat, p3.Value.lon), speed, speed));
+                    if (p3.HasValue && p4.HasValue)
+                        TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                            new Position(p3.Value.lat, p3.Value.lon),
+                            new Position(p4.Value.lat, p4.Value.lon), speed, speed));
+                }
+            }
+            void drawObaTripPath()
+            {
+                TripPolyline.GradientLevels.Clear();
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.LightGreen));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(50, Color.YellowGreen));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(200, Color.Goldenrod));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(800, Color.Red));
+                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(4000, Color.Black));
+
+                double prevDistanceError = 0;
+                ObaTripPointLink prevPoint = null;
+                foreach (var point in CurrentTripPoints)
+                {
+                    if (point.Item1 == null || point.Item2 == null)
+                        continue;
+                    if (point.Item1.IsTailPoint == true)
+                        continue;
+                    if (!CurrentTripEdges.Any(e => e.TripPoint == point.Item1))
+                        continue;
+                    var distanceFromObaPoint = GeometryHelpers.GetDistance(
+                        point.Item1.Latitude, point.Item1.Longitude,
+                        point.Item2.MappedLatitude, point.Item2.MappedLongitude);
+                    var distanceError = distanceFromObaPoint - point.Item1.RangeRadius;
+                    if (prevPoint != null)
+                    {
+                        TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                            new Position(prevPoint.MappedLatitude, prevPoint.MappedLongitude),
+                            new Position(point.Item2.MappedLatitude, point.Item2.MappedLongitude),
+                            prevDistanceError, distanceError));
+                    }
+                    prevDistanceError = distanceError;
+                    prevPoint = point.Item2;
+                }
+            }
+
             TripPoints.Clear();
             TripPolyline.Segments.Clear();
             switch (SelectedMapViewItemIndex)
             {
                 case 0:
-                    foreach (var point in CurrentTripPoints.Select(p => p.Item1))
-                    {
-                        var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
-                        var baseColor = Color.Red;
-                        if (point.IsTailPoint.HasValue)
-                        {
-                            if (point.IsTailPoint.Value)
-                                baseColor = Color.DarkGray;
-                            else
-                            {
-                                if (CurrentTripEdges.Any(e => e.TripPoint == point))
-                                    baseColor = Color.DarkCyan;
-                                else
-                                    baseColor = Color.DarkOrange;
-                            }
-                        }
-                        TripPoints.Add(new Circle()
-                        {
-                            Center = new Position(point.Latitude, point.Longitude),
-                            Radius = Distance.FromMeters(point.RangeRadius),
-                            FillColor = baseColor.MultiplyAlpha(0.05 + 0.15 * distanceFactor),
-                            StrokeColor = baseColor.MultiplyAlpha(0.2 + 0.6 * distanceFactor),
-                            StrokeWidth = 1
-                        });
-                    }
+                    drawTripPoints();
                     break;
                 case 1:
-                    TripPolyline.GradientLevels.Clear();
-                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.Green));
-                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(11.175, Color.YellowGreen));
-                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(22.35, Color.Goldenrod));
-                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(35.76, Color.Red));
-                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(89.4, Color.Black));
-
-                    for (int i = 0; i < CurrentTripEdges.Count; i++)
-                    {
-                        var edge = CurrentTripEdges[i];
-                        var prev = i > 0 ? CurrentTripEdges[i - 1] : null;
-
-                        (double lat, double lon)? p0 = null;
-                        (double lat, double lon)? p1 = null;
-                        (double lat, double lon)? p2 = null;
-                        (double lat, double lon)? p3 = null;
-                        (double lat, double lon)? p4 = null;
-                        (double lat, double lon)? p5 = null;
-
-                        if (prev?.InEdge != null)
-                            p0 = (prev.InEdge.Value.lat, prev.InEdge.Value.lon);
-                        if (prev?.OutEdge != null)
-                            p2 = (prev.OutEdge.Value.lat, prev.OutEdge.Value.lon);
-                        if (edge?.InEdge != null)
-                            p3 = (edge.InEdge.Value.lat, edge.InEdge.Value.lon);
-                        if (edge?.OutEdge != null)
-                            p5 = (edge.OutEdge.Value.lat, edge.OutEdge.Value.lon);
-
-                        if (p0.HasValue && p2.HasValue)
-                            p1 = ((p0.Value.lat + p2.Value.lat) / 2, (p0.Value.lon + p2.Value.lon) / 2);
-                        if (p3.HasValue && p5.HasValue)
-                            p4 = ((p3.Value.lat + p5.Value.lat) / 2, (p3.Value.lon + p5.Value.lon) / 2);
-
-                        double dist = 0;
-                        if (p1.HasValue && p2.HasValue && p3.HasValue && p4.HasValue)
-                        {
-                            dist = GeometryHelpers.GetDistance(p1.Value, p2.Value) +
-                                GeometryHelpers.GetDistance(p2.Value, p3.Value) +
-                                GeometryHelpers.GetDistance(p3.Value, p4.Value);
-                        }
-                        double speed = 0;
-                        if (prev != null)
-                            speed = dist / (edge.TripPoint.Time - prev.TripPoint.Time).TotalSeconds;
-
-                        if (p1.HasValue && p2.HasValue)
-                            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                                new Position(p1.Value.lat, p1.Value.lon),
-                                new Position(p2.Value.lat, p2.Value.lon), speed, speed));
-                        if (p2.HasValue && p3.HasValue)
-                            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                                new Position(p2.Value.lat, p2.Value.lon),
-                                new Position(p3.Value.lat, p3.Value.lon), speed, speed));
-                        if (p3.HasValue && p4.HasValue)
-                            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                                new Position(p3.Value.lat, p3.Value.lon),
-                                new Position(p4.Value.lat, p4.Value.lon), speed, speed));
-                    }
-                    //foreach (var edge in CurrentTripEdges)
-                    //{
-                    //    if (prev != null)
-                    //    {
-                    //        if ()
-                    //        if (prev.OutEdge.HasValue && edge.InEdge.HasValue)
-                    //            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                    //                new Position(prev.OutEdge.Value.lat, prev.OutEdge.Value.lon),
-                    //                new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
-                    //                1, 7));
-                    //        if (edge.InEdge.HasValue && edge.OutEdge.HasValue)
-                    //            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                    //                new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
-                    //                new Position(edge.OutEdge.Value.lat, edge.OutEdge.Value.lon),
-                    //                7, 1));
-                    //    }
-                    //    prev = edge;
-                    //}
+                    drawTripPath();
+                    break;
+                case 2:
+                    drawTripPoints();
+                    drawObaTripPath();
                     break;
             }
         }
