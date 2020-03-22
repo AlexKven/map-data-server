@@ -53,6 +53,7 @@ namespace TripRecorder2.ViewModels
             StartDate = DateTime.Today - TimeSpan.FromDays(7);
             EndDate = DateTime.Today;
 
+            TripPolyline.StrokeWidth = 3;
             SetLocation();
         }
 
@@ -324,24 +325,81 @@ namespace TripRecorder2.ViewModels
                     }
                     break;
                 case 1:
-                    GeometryHelpers.TripPointWithEdges prev = null;
-                    foreach (var edge in CurrentTripEdges)
+                    TripPolyline.GradientLevels.Clear();
+                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.Green));
+                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(11.175, Color.YellowGreen));
+                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(22.35, Color.Goldenrod));
+                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(35.76, Color.Red));
+                    TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(89.4, Color.Black));
+
+                    for (int i = 0; i < CurrentTripEdges.Count; i++)
                     {
-                        if (prev != null)
+                        var edge = CurrentTripEdges[i];
+                        var prev = i > 0 ? CurrentTripEdges[i - 1] : null;
+
+                        (double lat, double lon)? p0 = null;
+                        (double lat, double lon)? p1 = null;
+                        (double lat, double lon)? p2 = null;
+                        (double lat, double lon)? p3 = null;
+                        (double lat, double lon)? p4 = null;
+                        (double lat, double lon)? p5 = null;
+
+                        if (prev?.InEdge != null)
+                            p0 = (prev.InEdge.Value.lat, prev.InEdge.Value.lon);
+                        if (prev?.OutEdge != null)
+                            p2 = (prev.OutEdge.Value.lat, prev.OutEdge.Value.lon);
+                        if (edge?.InEdge != null)
+                            p3 = (edge.InEdge.Value.lat, edge.InEdge.Value.lon);
+                        if (edge?.OutEdge != null)
+                            p5 = (edge.OutEdge.Value.lat, edge.OutEdge.Value.lon);
+
+                        if (p0.HasValue && p2.HasValue)
+                            p1 = ((p0.Value.lat + p2.Value.lat) / 2, (p0.Value.lon + p2.Value.lon) / 2);
+                        if (p3.HasValue && p5.HasValue)
+                            p4 = ((p3.Value.lat + p5.Value.lat) / 2, (p3.Value.lon + p5.Value.lon) / 2);
+
+                        double dist = 0;
+                        if (p1.HasValue && p2.HasValue && p3.HasValue && p4.HasValue)
                         {
-                            if (prev.OutEdge.HasValue && edge.InEdge.HasValue)
-                                TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                                    new Position(prev.OutEdge.Value.lat, prev.OutEdge.Value.lon),
-                                    new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
-                                    0, 0));
-                            if (edge.InEdge.HasValue && edge.OutEdge.HasValue)
-                                TripPolyline.Segments.Add(new HeatmapPolylineSegment(
-                                    new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
-                                    new Position(edge.OutEdge.Value.lat, edge.OutEdge.Value.lon),
-                                    0, 0));
+                            dist = GeometryHelpers.GetDistance(p1.Value, p2.Value) +
+                                GeometryHelpers.GetDistance(p2.Value, p3.Value) +
+                                GeometryHelpers.GetDistance(p3.Value, p4.Value);
                         }
-                        prev = edge;
+                        double speed = 0;
+                        if (prev != null)
+                            speed = dist / (edge.TripPoint.Time - prev.TripPoint.Time).TotalSeconds;
+
+                        if (p1.HasValue && p2.HasValue)
+                            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                                new Position(p1.Value.lat, p1.Value.lon),
+                                new Position(p2.Value.lat, p2.Value.lon), speed, speed));
+                        if (p2.HasValue && p3.HasValue)
+                            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                                new Position(p2.Value.lat, p2.Value.lon),
+                                new Position(p3.Value.lat, p3.Value.lon), speed, speed));
+                        if (p3.HasValue && p4.HasValue)
+                            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                                new Position(p3.Value.lat, p3.Value.lon),
+                                new Position(p4.Value.lat, p4.Value.lon), speed, speed));
                     }
+                    //foreach (var edge in CurrentTripEdges)
+                    //{
+                    //    if (prev != null)
+                    //    {
+                    //        if ()
+                    //        if (prev.OutEdge.HasValue && edge.InEdge.HasValue)
+                    //            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                    //                new Position(prev.OutEdge.Value.lat, prev.OutEdge.Value.lon),
+                    //                new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
+                    //                1, 7));
+                    //        if (edge.InEdge.HasValue && edge.OutEdge.HasValue)
+                    //            TripPolyline.Segments.Add(new HeatmapPolylineSegment(
+                    //                new Position(edge.InEdge.Value.lat, edge.InEdge.Value.lon),
+                    //                new Position(edge.OutEdge.Value.lat, edge.OutEdge.Value.lon),
+                    //                7, 1));
+                    //    }
+                    //    prev = edge;
+                    //}
                     break;
             }
         }

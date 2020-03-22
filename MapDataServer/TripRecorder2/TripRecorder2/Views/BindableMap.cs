@@ -165,6 +165,25 @@ namespace TripRecorder2.Views
 
         private void RefreshHeatmapPolyline()
         {
+            var segments = HeatmapPolyline?.Segments;
+            var levels = HeatmapPolyline?.GradientLevels;
+            if (segments != null)
+            {
+                foreach (var segment in segments)
+                {
+                    var pStart = LatLonToSquareCoords(segment.StartPosition.Latitude,
+                        segment.StartPosition.Longitude, 0, 0, 20);
+                    var pEnd = LatLonToSquareCoords(segment.EndPosition.Latitude,
+                        segment.EndPosition.Longitude, 0, 0, 20);
+                    var relativeLevels = HeatmapPolyline.GetRelativeGradientLevels(segment.StartValue, segment.EndValue);
+                    var shader = SkiaSharp.SKShader.CreateLinearGradient(pStart, pEnd,
+                        relativeLevels.Select(l => new SkiaSharp.SKColor(
+                            (byte)(l.Color.R * 255.0), (byte)(l.Color.G * 255.0),
+                            (byte)(l.Color.B * 255.0), (byte)(l.Color.A * 255.0))).ToArray(),
+                        relativeLevels.Select(l => (float)l.Threshold).ToArray(),
+                        SkiaSharp.SKShaderTileMode.Clamp);
+                }
+            }
             TileLayers.Remove(HeatmapPolylineTileLayer);
             TileLayers.Add(HeatmapPolylineTileLayer);
         }
@@ -176,6 +195,7 @@ namespace TripRecorder2.Views
             canvas.Clear();
 
             var segments = HeatmapPolyline?.Segments;
+            var levels = HeatmapPolyline?.GradientLevels;
             if (segments != null)
             {
                 foreach (var segment in segments)
@@ -184,8 +204,19 @@ namespace TripRecorder2.Views
                         segment.StartPosition.Longitude, x, y, zoom);
                     var pEnd = LatLonToSquareCoords(segment.EndPosition.Latitude,
                         segment.EndPosition.Longitude, x, y, zoom);
-                    canvas.DrawLine(pStart.Item1, pStart.Item2, pEnd.Item1, pEnd.Item2,
-                        new SkiaSharp.SKPaint() { Color = SkiaSharp.SKColors.Red, StrokeWidth = 2 });
+                    var relativeLevels = HeatmapPolyline.GetRelativeGradientLevels(segment.StartValue, segment.EndValue);
+                    var shader = SkiaSharp.SKShader.CreateLinearGradient(pStart, pEnd,
+                        relativeLevels.Select(l => new SkiaSharp.SKColor(
+                            (byte)(l.Color.R * 255.0), (byte)(l.Color.G * 255.0),
+                            (byte)(l.Color.B * 255.0), (byte)(l.Color.A * 255.0))).ToArray(),
+                        relativeLevels.Select(l => (float)l.Threshold).ToArray(),
+                        SkiaSharp.SKShaderTileMode.Clamp);
+                    canvas.DrawLine(pStart.X, pStart.Y, pEnd.X, pEnd.Y,
+                        new SkiaSharp.SKPaint()
+                        {
+                            StrokeWidth = (float)HeatmapPolyline.StrokeWidth,
+                            Shader = shader
+                        });
                 }
                 canvas.Flush();
             }
@@ -201,7 +232,7 @@ namespace TripRecorder2.Views
             }
         }
 
-        private static (float, float) LatLonToSquareCoords(double lat, double lon, int x, int y, int zoom)
+        private static SkiaSharp.SKPoint LatLonToSquareCoords(double lat, double lon, int x, int y, int zoom)
         {
             // From https://web.archive.org/web/20190603233026/http://troybrant.net/blog/2010/01/mkmapview-and-zoom-levels-a-visual-guide/ 
 
@@ -213,7 +244,7 @@ namespace TripRecorder2.Views
                 (1 - Math.Sin(lat * Math.PI / 180))) / 2.0;
             var fracX = coordX - x;
             var fracY = coordY - y;
-            return ((float)fracX * TILE_SIZE, (float)fracY * TILE_SIZE);
+            return new SkiaSharp.SKPoint((float)fracX * TILE_SIZE, (float)fracY * TILE_SIZE);
         }
 
         private void UpdateCircles()
