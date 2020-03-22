@@ -171,15 +171,29 @@ namespace MapDataServer.Helpers
                                 distance += GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
                                     dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
 
-                            if (lastUsefulPointEdge == null)
-                                outUsefulPointEdges.Add(new TripPointWithEdges(lastUsefulPoint, null, (dist.Value.p1EdgeLat, dist.Value.p1EdgeLon)));
-                            else
-                                outUsefulPointEdges.Add(new TripPointWithEdges(lastUsefulPoint, (lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon),
-                                    (dist.Value.p1EdgeLat, dist.Value.p1EdgeLon)));
+                            if (outUsefulPointEdges != null)
+                            {
+                                if (lastUsefulPointEdge == null)
+                                    outUsefulPointEdges.Add(new TripPointWithEdges(lastUsefulPoint, null, (dist.Value.p1EdgeLat, dist.Value.p1EdgeLon)));
+                                else
+                                    outUsefulPointEdges.Add(new TripPointWithEdges(lastUsefulPoint, (lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon),
+                                        (dist.Value.p1EdgeLat, dist.Value.p1EdgeLon)));
+                            }
 
                             lastUsefulPoint = point;
                             lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
                         }
+                    }
+                }
+                if (lastUsefulPoint != null)
+                {
+                    if (outUsefulPointEdges != null)
+                    {
+                        if (lastUsefulPointEdge == null)
+                            outUsefulPointEdges.Add(new TripPointWithEdges(lastUsefulPoint, null, null));
+                        else
+                            outUsefulPointEdges.Add(new TripPointWithEdges(lastUsefulPoint,
+                                (lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon), null));
                     }
                 }
                 return (uint)distance;

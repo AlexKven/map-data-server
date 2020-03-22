@@ -245,6 +245,8 @@ namespace TripRecorder2.ViewModels
         #region Trip Map
         private List<TripPoint> CurrentTripPoints { get; }
             = new List<TripPoint>();
+        private List<GeometryHelpers.TripPointWithEdges> CurrentTripEdges { get; }
+            = new List<GeometryHelpers.TripPointWithEdges>();
 
         public IEnumerable<string> MapViewItems { get; } = new string[]
         {
@@ -298,9 +300,19 @@ namespace TripRecorder2.ViewModels
                     foreach (var point in CurrentTripPoints)
                     {
                         var distanceFactor = Math.Min(1.0, 10.0 / point.RangeRadius);
-                        var baseColor = point.IsTailPoint.HasValue ?
-                            (point.IsTailPoint.Value ? Color.DarkGray : Color.DarkCyan)
-                            : Color.Red;
+                        var baseColor = Color.Red;
+                        if (point.IsTailPoint.HasValue)
+                        {
+                            if (point.IsTailPoint.Value)
+                                baseColor = Color.DarkGray;
+                            else
+                            {
+                                if (CurrentTripEdges.Any(e => e.TripPoint == point))
+                                    baseColor = Color.DarkCyan;
+                                else
+                                    baseColor = Color.DarkOrange;
+                            }
+                        }
                         TripPoints.Add(new Circle()
                         {
                             Center = new Position(point.Latitude, point.Longitude),
@@ -312,10 +324,8 @@ namespace TripRecorder2.ViewModels
                     }
                     break;
                 case 1:
-                    List<GeometryHelpers.TripPointWithEdges> edges = new List<GeometryHelpers.TripPointWithEdges>();
-                    GeometryHelpers.GetTotalLength(CurrentTripPoints, edges);
                     GeometryHelpers.TripPointWithEdges prev = null;
-                    foreach (var edge in edges)
+                    foreach (var edge in CurrentTripEdges)
                     {
                         if (prev != null)
                         {
@@ -521,6 +531,9 @@ namespace TripRecorder2.ViewModels
                 RequestTaskSource = new TaskCompletionSource<object>();
 
                 CurrentTripPoints.Clear();
+                CurrentTripEdges.Clear();
+                TripPolyline.Segments.Clear();
+                TripPoints.Clear();
 
                 Progress = 0;
                 ShowProgress = true;
@@ -536,6 +549,9 @@ namespace TripRecorder2.ViewModels
                     if (total == 0)
                         return;
                     CurrentTripPoints.AddRange(result.Items);
+                    CurrentTripEdges.Clear();
+                    GeometryHelpers.GetTotalLength(CurrentTripPoints
+                        .Where(p => p.IsTailPoint == false), CurrentTripEdges);
                     SetTripMap();
                     Progress = (double)current / (double)total;
                 } while (current < total);
