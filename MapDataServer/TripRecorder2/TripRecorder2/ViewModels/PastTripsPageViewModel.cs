@@ -251,7 +251,8 @@ namespace TripRecorder2.ViewModels
 
         public IEnumerable<string> MapViewItems { get; } = new string[]
         {
-            "Trip points", "Approximate trip path", "OneBusAway trip point accuracy"
+            "Trip points", "Approximate trip path", "OneBusAway trip point accuracy",
+            "OneBusAway trip path with delay", "OneBusAway trip path delay change"
         };
 
         private int _SelectedMapViewItemIndex = 0;
@@ -381,14 +382,44 @@ namespace TripRecorder2.ViewModels
                             new Position(p4.Value.lat, p4.Value.lon), speed, speed));
                 }
             }
-            void drawObaTripPath()
+            // fillMode = 0: proximity to trip point
+            // fillMode = 1: trip delay
+            // fillMode = 2: trip delay change
+            void drawObaTripPath(byte fillMode)
             {
-                TripPolyline.GradientLevels.Clear();
-                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.LightGreen));
-                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(50, Color.YellowGreen));
-                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(200, Color.Goldenrod));
-                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(800, Color.Red));
-                TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(4000, Color.Black));
+                switch (fillMode)
+                {
+                    case 0:
+                        TripPolyline.GradientLevels.Clear();
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.LightGreen));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(50, Color.YellowGreen));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(200, Color.Goldenrod));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(800, Color.Red));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(4000, Color.Black));
+                        break;
+                    case 1:
+                        TripPolyline.GradientLevels.Clear();
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(-1200, Color.AliceBlue));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(-600, Color.Cyan));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(-300, Color.LightBlue));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.LightGreen));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(300, Color.YellowGreen));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(600, Color.Goldenrod));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(1200, Color.Red));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(2400, Color.Black));
+                        break;
+                    case 2:
+                        TripPolyline.GradientLevels.Clear();
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(-600, Color.AliceBlue));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(-300, Color.Cyan));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(-150, Color.LightBlue));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(0, Color.LightGreen));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(150, Color.YellowGreen));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(300, Color.Goldenrod));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(600, Color.Red));
+                        TripPolyline.GradientLevels.Add(new HeatmapPolylineGradientLevel(1200, Color.Black));
+                        break;
+                }
 
                 double prevDistanceError = 0;
                 ObaTripPointLink prevPoint = null;
@@ -406,10 +437,30 @@ namespace TripRecorder2.ViewModels
                     var distanceError = distanceFromObaPoint - point.Item1.RangeRadius;
                     if (prevPoint != null)
                     {
+                        double startValue = 0;
+                        double endValue = 0;
+                        switch (fillMode)
+                        {
+                            case 0:
+                                startValue = prevDistanceError;
+                                endValue = distanceError;
+                                break;
+                            case 1:
+                                startValue = prevPoint.DelaySeconds;
+                                endValue = point.Item2.DelaySeconds;
+                                break;
+                            case 2:
+                                var change = point.Item2.DelaySeconds - prevPoint.DelaySeconds;
+                                var dist = GeometryHelpers.GetDistance(
+                                    prevPoint.MappedLatitude, prevPoint.MappedLongitude,
+                                    point.Item2.MappedLatitude, point.Item2.MappedLongitude);
+                                startValue = endValue = change / dist;
+                                break;
+                        }
                         TripPolyline.Segments.Add(new HeatmapPolylineSegment(
                             new Position(prevPoint.MappedLatitude, prevPoint.MappedLongitude),
                             new Position(point.Item2.MappedLatitude, point.Item2.MappedLongitude),
-                            prevDistanceError, distanceError));
+                            startValue, endValue));
                     }
                     prevDistanceError = distanceError;
                     prevPoint = point.Item2;
@@ -428,7 +479,13 @@ namespace TripRecorder2.ViewModels
                     break;
                 case 2:
                     drawTripPoints();
-                    drawObaTripPath();
+                    drawObaTripPath(0);
+                    break;
+                case 3:
+                    drawObaTripPath(1);
+                    break;
+                case 4:
+                    drawObaTripPath(2);
                     break;
             }
         }
