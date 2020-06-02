@@ -19,10 +19,11 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "ClientServerShared", "Clien
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TripRecorder2.Android", "TripRecorder2\TripRecorder2.Android\TripRecorder2.Android.csproj", "{2E4649EA-D8D2-431C-AB2D-38089C4E5DE6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TripRecorder2", "TripRecorder2\TripRecorder2\TripRecorder2.csproj", "{D6951938-7A44-474E-B82E-80BB2CE96860}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TripRecorder2", "TripRecorder2\TripRecorder2\TripRecorder2.csproj", "{D6951938-7A44-474E-B82E-80BB2CE96860}"
 EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		ClientServerShared\ClientServerShared.projitems*{0f25a7be-2b24-463f-a0f0-834d66e4568c}*SharedItemsImports = 5
 		ClientServerShared\ClientServerShared.projitems*{544fd1f7-28fb-436e-9510-317944b3d935}*SharedItemsImports = 13
 		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{6279c845-92f8-4333-ab99-3d213163593c}*SharedItemsImports = 13
 		ClientServerShared\ClientServerShared.projitems*{7b3edb29-eecd-4a81-963a-55107c85590f}*SharedItemsImports = 4
@@ -31,6 +32,7 @@ Global
 		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{7d945523-1ec2-459d-8bdc-083a74484d4e}*SharedItemsImports = 4
 		ClientServerShared\ClientServerShared.projitems*{c67bbe47-a7bd-4b60-b566-532403e00358}*SharedItemsImports = 4
 		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{c67bbe47-a7bd-4b60-b566-532403e00358}*SharedItemsImports = 4
+		ClientServerShared\ClientServerShared.projitems*{d6951938-7a44-474e-b82e-80bb2ce96860}*SharedItemsImports = 5
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Ad-Hoc|Any CPU = Ad-Hoc|Any CPU

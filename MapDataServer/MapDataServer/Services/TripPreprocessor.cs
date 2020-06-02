@@ -5,6 +5,7 @@ using MapDataServer.Utility;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,6 +31,9 @@ namespace MapDataServer.Services
                                 where point.TripId == tripId
                                 orderby point.Time ascending
                                 select point).ToListAsync(cancellationToken);
+            var trip = await (from t in Database.Trips
+                              where t.Id == tripId
+                              select t).FirstOrDefaultAsync();
 
             DeDupe(points, duplicates);
 
@@ -44,10 +48,58 @@ namespace MapDataServer.Services
                 builder.AppendLine($"{point.Latitude},{point.Longitude}");
             var res = builder.ToString();
 
+            var startThreshold = 20;
+            var endThreshold = 20;
+            if (trip != null)
+            {
+                switch (trip.HovStatus)
+                {
+                    case HovStatus.Bicycle:
+                        startThreshold = 5;
+                        endThreshold = 10;
+                        break;
+                    case HovStatus.HeavyRail:
+                        startThreshold = 20;
+                        endThreshold = 25;
+                        break;
+                    case HovStatus.Hov2:
+                        startThreshold = 5;
+                        endThreshold = 15;
+                        break;
+                    case HovStatus.Hov3:
+                        startThreshold = 5;
+                        endThreshold = 15;
+                        break;
+                    case HovStatus.Sov:
+                        startThreshold = 5;
+                        endThreshold = 15;
+                        break;
+                    case HovStatus.LightRail:
+                        startThreshold = 5;
+                        endThreshold = 20;
+                        break;
+                    case HovStatus.Motorcycle:
+                        startThreshold = 5;
+                        endThreshold = 10;
+                        break;
+                    case HovStatus.Pedestrian:
+                        startThreshold = 2;
+                        endThreshold = 5;
+                        break;
+                    case HovStatus.Streetcar:
+                        startThreshold = 5;
+                        endThreshold = 20;
+                        break;
+                    case HovStatus.Transit:
+                        startThreshold = 5;
+                        endThreshold = 20;
+                        break;
+                }
+            }
 
-            var startTailPointsCount = GetTailPointsCount(points);
+            var startTailPointsCount = GetTailPointsCount(points, startThreshold);
             var pointsFromEnd = points.Reverse<TripPoint>();
-            var endTailPointsCount = GetTailPointsCount(pointsFromEnd);
+            var endTailPointsCount = GetTailPointsCount(pointsFromEnd, endThreshold);
             var total = points.Count;
 
             var pointsToUpdate = new List<TripPoint>();
@@ -71,10 +123,26 @@ namespace MapDataServer.Services
             pointsToUpdate.Clear();
 
             var result = new PreprocessedTrip();
-            var usefulPoints = points.Skip(startTailPointsCount).Take(total - startTailPointsCount - endTailPointsCount).ToArray();
-            foreach (var pt in usefulPoints)
+            var usefulPoints = points.Skip(startTailPointsCount).Take(total - startTailPointsCount - endTailPointsCount).ToList();
+            for (int i = 0; i < usefulPoints.Count; i++)
             {
-                pt.IsTailPoint = false;
+                TripPoint prev = null;
+                TripPoint next = null;
+                var pt = usefulPoints[i];
+                if (i > 0)
+                    prev = usefulPoints[i - 1];
+                if (i < usefulPoints.Count - 1)
+                    next = usefulPoints[i + 1];
+
+                var isBad = false;
+                if (prev != null && next != null)
+                    isBad = IsBadPoint(pt, prev, next);
+                if (isBad)
+                {
+                    usefulPoints.RemoveAt(i);
+                    i--;
+                }
+                pt.IsTailPoint = isBad;
                 pointsToUpdate.Add(pt);
             }
 
@@ -104,7 +172,7 @@ namespace MapDataServer.Services
                                      where link.MapTripId == tripId
                                      select link).FirstOrDefaultAsync();
 
-            if (obaTripLink != null && usefulPoints.Length > 0)
+            if (obaTripLink != null && usefulPoints.Count > 0)
             {
                 var calculator = new DelayCalculator(ObaRepository, obaTripLink.ObaTripId, actualStartTime);
                 if (await calculator.Initialize())
@@ -125,12 +193,12 @@ namespace MapDataServer.Services
                 ActualEndTime = actualEndTime,
                 DistanceMeters = distance
             };
-            if (usefulPoints.Length > 0)
+            if (usefulPoints.Count > 0)
             {
                 var startLat = usefulPoints[0].Latitude;
                 var startLon = usefulPoints[0].Longitude;
-                var endLat = usefulPoints[usefulPoints.Length - 1].Latitude;
-                var endLon = usefulPoints[usefulPoints.Length - 1].Longitude;
+                var endLat = usefulPoints[usefulPoints.Count - 1].Latitude;
+                var endLon = usefulPoints[usefulPoints.Count - 1].Longitude;
                 preprocessed.StartLatitude = startLat;
                 preprocessed.StartLongitude = startLon;
                 preprocessed.StartRegion = MapRegion.GetRegionContaining(startLat, startLon);
@@ -168,7 +236,7 @@ namespace MapDataServer.Services
             }
         }
 
-        private static int GetTailPointsCount(IEnumerable<TripPoint> points)
+        private static int GetTailPointsCount(IEnumerable<TripPoint> points, double distThreshold)
         {
             double distance = 0;
             TripPoint lastUsefulPoint = null;
@@ -178,7 +246,7 @@ namespace MapDataServer.Services
             using (var enumerator = points.GetEnumerator())
             {
                 bool notAtEnd;
-                while (notAtEnd = enumerator.MoveNext() && distance < 20)
+                while (notAtEnd = enumerator.MoveNext() && distance < distThreshold)
                 {
                     currentPointIndex++;
                     if (lastUsefulPoint == null)
@@ -193,6 +261,11 @@ namespace MapDataServer.Services
                             if (lastUsefulPointEdge != null)
                                 distance += GeometryHelpers.GetDistance(lastUsefulPointEdge.Value.lat, lastUsefulPointEdge.Value.lon,
                                     dist.Value.p1EdgeLat, dist.Value.p1EdgeLon);
+
+                            // For if the first point is a bad point
+                            if (currentPointIndex == 1 && distance > 1500)
+                                distance = 0;
+
                             lastUsefulPoint = point;
                             lastUsefulPointEdge = (lat: dist.Value.p2EdgeLat, lon: dist.Value.p2EdgeLon);
                         }
@@ -204,5 +277,29 @@ namespace MapDataServer.Services
             }
         }
 
+        private static bool IsBadPoint(TripPoint current, TripPoint prev, TripPoint next)
+        {
+            // It is a bad point if
+            // angle is < 90, distance > 2km, and speed > 80 m/s 
+            // angle is < 45, distance > 1km, and speed > 40 m/s
+
+            var sideA = GeometryHelpers.GetDistance(next.Latitude, next.Longitude, prev.Latitude, prev.Longitude);
+            var sideB = GeometryHelpers.GetDistance(prev.Latitude, prev.Longitude, current.Latitude, current.Longitude);
+            var sideC = GeometryHelpers.GetDistance(next.Latitude, next.Longitude, current.Latitude, current.Longitude);
+
+            var angle = GeometryHelpers.GetTriangleAngleA(sideA, sideB, sideC);
+            if (!angle.HasValue)
+                return false;
+
+            var totalDistance = sideB + sideC;
+            var totalTime = next.Time - prev.Time;
+            var speed = totalDistance / totalTime.TotalSeconds;
+
+            if (angle.Value < Math.PI / 2 && totalDistance > 2000 && speed > 80)
+                return true;
+            if (angle.Value < Math.PI / 4 && totalDistance > 1000 && speed > 40)
+                return true;
+            return false;
+        }
     }
 }

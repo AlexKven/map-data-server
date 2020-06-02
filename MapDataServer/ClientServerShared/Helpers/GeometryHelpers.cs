@@ -216,5 +216,13 @@ namespace MapDataServer.Helpers
             var p2EdgeLon = p2.Longitude + (p1.Longitude - p2.Longitude) * p2RadiusFactor;
             return (distanceBetweenEdges, p1EdgeLat, p1EdgeLon, p2EdgeLat, p2EdgeLon);
         }
+
+        public static double? GetTriangleAngleA(double sideA, double sideB, double sideC)
+        {
+            var cos = (sideB * sideB + sideC * sideC - (sideA * sideA)) / (2 * sideB * sideC);
+            if (cos > 1 || cos < -1)
+                return null;
+            return Math.Acos(cos);
+        }
     }
 }
