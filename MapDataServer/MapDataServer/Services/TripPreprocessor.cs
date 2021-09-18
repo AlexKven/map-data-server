@@ -249,15 +249,15 @@ namespace MapDataServer.Services
                 while (notAtEnd = enumerator.MoveNext() && distance < distThreshold)
                 {
                     currentPointIndex++;
+                    var point = enumerator.Current;
+                    // Tunnel mode points are exact
+                    if (point.FromTunnelMode)
+                        return currentPointIndex;
+
                     if (lastUsefulPoint == null)
                         lastUsefulPoint = enumerator.Current;
                     else
                     {
-                        var point = enumerator.Current;
-
-                        // Tunnel mode points are exact
-                        if (point.FromTunnelMode)
-                            return currentPointIndex;
                         var dist = GeometryHelpers.ShortestDistanceBetweenTripPoints(lastUsefulPoint, point);
                         if (dist.HasValue)
                         {
