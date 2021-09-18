@@ -47,5 +47,10 @@ namespace MapDataServer.Models
         [Column(Name = nameof(IsTailPoint)), DataType(LinqToDB.DataType.Boolean)]
 #endif
         public bool? IsTailPoint { get; set; }
+
+#if __SERVER__
+        [Column(Name = nameof(FromTunnelMode)), DataType(LinqToDB.DataType.Boolean)]
+#endif
+        public bool FromTunnelMode { get; set; } = false;
     }
 }
