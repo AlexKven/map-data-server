@@ -135,7 +135,7 @@ namespace MapDataServer.Services
                     next = usefulPoints[i + 1];
 
                 var isBad = false;
-                if (prev != null && next != null)
+                if (prev != null && next != null && !pt.FromTunnelMode)
                     isBad = IsBadPoint(pt, prev, next);
                 if (isBad)
                 {

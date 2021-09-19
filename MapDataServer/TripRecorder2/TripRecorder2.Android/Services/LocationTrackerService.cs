@@ -20,6 +20,16 @@ namespace TripRecorder2.Droid.Services
         public override void OnCreate()
         {
             StartForeground(Constants.SERVICE_RUNNING_NOTIFICATION_ID, GetNotification());
+            MessagingCenter.Subscribe<PostPointMessage>(this, nameof(PostPointMessage), message =>
+            {
+                var tracker = AppStartup.Container.Resolve<LocationTracker>();
+                tracker.ManuallyPostPoint(message.Point);
+            });
+            MessagingCenter.Subscribe<SetTunnelModeMessage>(this, nameof(SetTunnelModeMessage), message =>
+            {
+                var tracker = AppStartup.Container.Resolve<LocationTracker>();
+                tracker.IsInTunnelMode = message.IsInTunnelMode;
+            });
         }
 
         public override IBinder OnBind(Intent intent)

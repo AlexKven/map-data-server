@@ -18,4 +18,14 @@ namespace TripRecorder2.Models
     {
         public string Message { get; set; }
     }
+
+    public class PostPointMessage
+    {
+        public TripPoint Point { get; set; }
+    }
+
+    public class SetTunnelModeMessage
+    {
+        public bool IsInTunnelMode { get; set; }
+    }
 }

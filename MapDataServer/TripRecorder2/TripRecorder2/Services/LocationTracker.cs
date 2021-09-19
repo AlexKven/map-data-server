@@ -36,6 +36,26 @@ namespace TripRecorder2.Services
             TripSettingsProvider = tripSettingsProvider;
         }
 
+        private object SettingsLock = new object();
+        private bool _IsInTunnelMode = false;
+        public bool IsInTunnelMode
+        {
+            get
+            {
+                lock (SettingsLock)
+                {
+                    return _IsInTunnelMode;
+                }
+            }
+            set
+            {
+                lock (SettingsLock)
+                {
+                    _IsInTunnelMode = value;
+                }
+            }
+        }
+
         public async Task Run(CancellationToken token)
         {
             await Task.Run(async () =>
@@ -92,27 +112,35 @@ namespace TripRecorder2.Services
             }, token);
         }
 
+        public void ManuallyPostPoint(TripPoint point)
+        {
+            point.Time = DateTime.Now;
+            point.TripId = CurrentTrip?.Id ?? 0;
+
+            PendingPoints.Enqueue(point);
+            PointsListService.TripPagePoints.Enqueue(point);
+
+            SendMessage($"Point: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
+        }
+
         private void Locator_PositionError(object sender, PositionErrorEventArgs e)
         {
         }
 
         private void Locator_PositionChanged(object sender, PositionEventArgs e)
         {
-            var position = e.Position;
-
-            var point = new TripPoint()
+            if (!IsInTunnelMode)
             {
-                Longitude = position.Longitude,
-                Latitude = position.Latitude,
-                RangeRadius = position.Accuracy,
-                Time = DateTime.Now,
-                TripId = CurrentTrip?.Id ?? 0
-            };
-            PendingPoints.Enqueue(point);
-            PointsListService.TripPagePoints.Enqueue(point);
+                var position = e.Position;
 
-            SendMessage($"Point: {position.Latitude}, {position.Longitude} ({position.Accuracy}, {DateTime.Now.ToString("HH:mm:ss")})");
-
+                var point = new TripPoint()
+                {
+                    Longitude = position.Longitude,
+                    Latitude = position.Latitude,
+                    RangeRadius = position.Accuracy
+                };
+                ManuallyPostPoint(point);
+            }
         }
 
         private void SendMessage(string message)

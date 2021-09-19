@@ -59,116 +59,123 @@ namespace MapDataServer.Services
 
         private async Task InitializeAsync()
         {
-            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            var sp = DataProvider.GetSchemaProvider();
-            var tableTypes = sp.GetSchema(this).Tables.Select(table => table.TableName);
-            if (!tableTypes.Contains("GeoTags"))
+            try
             {
-                await this.CreateTableAsync<GeoTag>();
+                Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+                var sp = DataProvider.GetSchemaProvider();
+                var tableTypes = sp.GetSchema(this).Tables.Select(table => table.TableName);
+                if (!tableTypes.Select(s => s.ToLower()).Contains("geotags"))
+                {
+                    await this.CreateTableAsync<GeoTag>();
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("MapNodes".ToLower()))
+                {
+                    await this.CreateTableAsync<MapNode>();
+                    await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX LonLat(Longitude, Latitude)");
+                    await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX LatLon(Latitude, Longitude);");
+                    await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX SavedDate(SavedDate);");
+                    await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX Region(Region);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("MapRegions".ToLower()))
+                {
+                    await this.CreateTableAsync<MapRegion>();
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("MapRelations".ToLower()))
+                {
+                    await this.CreateTableAsync<MapRelation>();
+                    await this.ExecuteAsync("ALTER TABLE MapRelations ADD INDEX SavedDate(SavedDate);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("MapRelationMembers".ToLower()))
+                {
+                    await this.CreateTableAsync<MapRelationMember>();
+                    await this.ExecuteAsync("ALTER TABLE MapRelationMembers ADD INDEX GeoId(GeoId);");
+                    await this.ExecuteAsync("ALTER TABLE MapRelationMembers ADD INDEX `Type`(`Type`);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("MapWays".ToLower()))
+                {
+                    await this.CreateTableAsync<MapWay>();
+                    await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX SavedDate(SavedDate);");
+                    await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLonLat(MinLon, MinLat);");
+                    await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLatLon(MinLat, MinLon);");
+                    await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLonLat(MaxLon, MaxLat);");
+                    await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLatLon(MaxLat, MaxLon);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("MapHighways".ToLower()))
+                {
+                    await this.CreateTableAsync<MapHighway>();
+                    await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX SavedDate(SavedDate);");
+                    await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MinLonLat(MinLon, MinLat);");
+                    await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MinLatLon(MinLat, MinLon);");
+                    await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MaxLonLat(MaxLon, MaxLat);");
+                    await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MaxLatLon(MaxLat, MaxLon);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("WayNodeLinks".ToLower()))
+                {
+                    await this.CreateTableAsync<WayNodeLink>();
+                    await this.ExecuteAsync("ALTER TABLE WayNodeLinks ADD INDEX WayId(WayId);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("Trips".ToLower()))
+                {
+                    await this.CreateTableAsync<Trip>();
+                    await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX StartTime(StartTime);");
+                    await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX EndTime(EndTime);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("PreprocessedTrips".ToLower()))
+                {
+                    await this.CreateTableAsync<PreprocessedTrip>();
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX ActualStartTime(ActualStartTime);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX ActualEndTime(ActualEndTime);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX DistanceMeters(DistanceMeters);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX StartLongitude(StartLongitude);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX StartLatitude(StartLatitude);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX StartRegion(StartRegion);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX EndLongitude(EndLongitude);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX EndLatitude(EndLatitude);");
+                    await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX EndRegion(EndRegion);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("TripPoints".ToLower()))
+                {
+                    await this.CreateTableAsync<TripPoint>();
+                    await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Longitude(Longitude);");
+                    await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Latitude(Latitude);");
+                    await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Time(Time);");
+                    await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX TripId(TripId);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("ObaTripLinks".ToLower()))
+                {
+                    await this.CreateTableAsync<ObaTripLink>();
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("ObaServicePeriods".ToLower()))
+                {
+                    await this.CreateTableAsync<ObaServicePeriod>();
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("ObaTrips".ToLower()))
+                {
+                    await this.CreateTableAsync<ObaTrip>();
+                    await this.ExecuteAsync("ALTER TABLE ObaTrips ADD INDEX ObaRouteId(ObaRouteId);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("ObaRoutes".ToLower()))
+                {
+                    await this.CreateTableAsync<ObaRoute>();
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("ObaTripStopLinks".ToLower()))
+                {
+                    await this.CreateTableAsync<ObaTripStopLink>();
+                    await this.ExecuteAsync("ALTER TABLE ObaTripStopLinks ADD INDEX StopSequence(StopSequence);");
+                }
+                if (!tableTypes.Select(s => s.ToLower()).Contains("ObaTripPointLinks".ToLower()))
+                {
+                    await this.CreateTableAsync<ObaTripPointLink>();
+                    await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX ObaTripId(ObaTripId);");
+                    await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX MappedLatitude(MappedLatitude);");
+                    await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX MappedLongitude(MappedLongitude);");
+                    await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX Time(Time);");
+                    await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX DistanceAlongTrip(DistanceAlongTrip);");
+                }
             }
-            if (!tableTypes.Contains("MapNodes"))
+            catch (Exception ex)
             {
-                await this.CreateTableAsync<MapNode>();
-                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX LonLat(Longitude, Latitude)");
-                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX LatLon(Latitude, Longitude);");
-                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX SavedDate(SavedDate);");
-                await this.ExecuteAsync("ALTER TABLE MapNodes ADD INDEX Region(Region);");
-            }
-            if (!tableTypes.Contains("MapRegions"))
-            {
-                await this.CreateTableAsync<MapRegion>();
-            }
-            if (!tableTypes.Contains("MapRelations"))
-            {
-                await this.CreateTableAsync<MapRelation>();
-                await this.ExecuteAsync("ALTER TABLE MapRelations ADD INDEX SavedDate(SavedDate);");
-            }
-            if (!tableTypes.Contains("MapRelationMembers"))
-            {
-                await this.CreateTableAsync<MapRelationMember>();
-                await this.ExecuteAsync("ALTER TABLE MapRelationMembers ADD INDEX GeoId(GeoId);");
-                await this.ExecuteAsync("ALTER TABLE MapRelationMembers ADD INDEX `Type`(`Type`);");
-            }
-            if (!tableTypes.Contains("MapWays"))
-            {
-                await this.CreateTableAsync<MapWay>();
-                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX SavedDate(SavedDate);");
-                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLonLat(MinLon, MinLat);");
-                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MinLatLon(MinLat, MinLon);");
-                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLonLat(MaxLon, MaxLat);");
-                await this.ExecuteAsync("ALTER TABLE MapWays ADD INDEX MaxLatLon(MaxLat, MaxLon);");
-            }
-            if (!tableTypes.Contains("MapHighways"))
-            {
-                await this.CreateTableAsync<MapHighway>();
-                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX SavedDate(SavedDate);");
-                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MinLonLat(MinLon, MinLat);");
-                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MinLatLon(MinLat, MinLon);");
-                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MaxLonLat(MaxLon, MaxLat);");
-                await this.ExecuteAsync("ALTER TABLE MapHighways ADD INDEX MaxLatLon(MaxLat, MaxLon);");
-            }
-            if (!tableTypes.Contains("WayNodeLinks"))
-            {
-                await this.CreateTableAsync<WayNodeLink>();
-                await this.ExecuteAsync("ALTER TABLE WayNodeLinks ADD INDEX WayId(WayId);");
-            }
-            if (!tableTypes.Contains("Trips"))
-            {
-                await this.CreateTableAsync<Trip>();
-                await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX StartTime(StartTime);");
-                await this.ExecuteAsync("ALTER TABLE Trips ADD INDEX EndTime(EndTime);");
-            }
-            if (!tableTypes.Contains("PreprocessedTrips"))
-            {
-                await this.CreateTableAsync<PreprocessedTrip>();
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX ActualStartTime(ActualStartTime);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX ActualEndTime(ActualEndTime);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX DistanceMeters(DistanceMeters);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX StartLongitude(StartLongitude);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX StartLatitude(StartLatitude);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX StartRegion(StartRegion);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX EndLongitude(EndLongitude);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX EndLatitude(EndLatitude);");
-                await this.ExecuteAsync("ALTER TABLE PreprocessedTrips ADD INDEX EndRegion(EndRegion);");
-            }
-            if (!tableTypes.Contains("TripPoints"))
-            {
-                await this.CreateTableAsync<TripPoint>();
-                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Longitude(Longitude);");
-                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Latitude(Latitude);");
-                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX Time(Time);");
-                await this.ExecuteAsync("ALTER TABLE TripPoints ADD INDEX TripId(TripId);");
-            }
-            if (!tableTypes.Contains("ObaTripLinks"))
-            {
-                await this.CreateTableAsync<ObaTripLink>();
-            }
-            if (!tableTypes.Contains("ObaServicePeriods"))
-            {
-                await this.CreateTableAsync<ObaServicePeriod>();
-            }
-            if (!tableTypes.Contains("ObaTrips"))
-            {
-                await this.CreateTableAsync<ObaTrip>();
-                await this.ExecuteAsync("ALTER TABLE ObaTrips ADD INDEX ObaRouteId(ObaRouteId);");
-            }
-            if (!tableTypes.Contains("ObaRoutes"))
-            {
-                await this.CreateTableAsync<ObaRoute>();
-            }
-            if (!tableTypes.Contains("ObaTripStopLinks"))
-            {
-                await this.CreateTableAsync<ObaTripStopLink>();
-                await this.ExecuteAsync("ALTER TABLE ObaTripStopLinks ADD INDEX StopSequence(StopSequence);");
-            }
-            if (!tableTypes.Contains("ObaTripPointLinks"))
-            {
-                await this.CreateTableAsync<ObaTripPointLink>();
-                await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX ObaTripId(ObaTripId);");
-                await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX MappedLatitude(MappedLatitude);");
-                await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX MappedLongitude(MappedLongitude);");
-                await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX Time(Time);");
-                await this.ExecuteAsync("ALTER TABLE ObaTripPointLinks ADD INDEX DistanceAlongTrip(DistanceAlongTrip);");
+                throw;
             }
         }
 

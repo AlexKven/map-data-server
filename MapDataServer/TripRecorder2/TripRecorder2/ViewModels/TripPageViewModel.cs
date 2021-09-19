@@ -52,11 +52,89 @@ namespace TripRecorder2.ViewModels
             private set => SetProperty(ref _CanSetTripDetails, value);
         }
 
+        private bool _IsInTunnelMode = false;
+        public bool IsInTunnelMode
+        {
+            get => _IsInTunnelMode;
+            set
+            {
+                SetProperty(ref _IsInTunnelMode, value);
+                MessagingCenter.Send(new SetTunnelModeMessage()
+                {
+                    IsInTunnelMode = _IsInTunnelMode
+                }, nameof(SetTunnelModeMessage));
+            }
+        }
+
+        public ObservableRangeCollection<string> TunnelStationLineNames { get; }
+            = new ObservableRangeCollection<string>();
+
+        public ObservableRangeCollection<string> TunnelStationNames { get; }
+            = new ObservableRangeCollection<string>();
+
+        private int _CurrentTunnelStation = 0;
+        public int CurrentTunnelStation
+        {
+            get => _CurrentTunnelStation;
+            set
+            {
+                SetProperty(ref _CurrentTunnelStation, value);
+
+                if (_CurrentTunnelStation > 0 &&
+                    _CurrentTunnelStationLine > 0)
+                {
+                    var station = TunnelStationLines[CurrentTunnelStationLine - 1]
+                        .TunnelStations[CurrentTunnelStation - 1];
+                    var point = new TripPoint()
+                    {
+                        FromTunnelMode = true,
+                        Latitude = station.Latitude,
+                        Longitude = station.Longitude,
+                        RangeRadius = 5
+                    };
+                    MessagingCenter.Send(new PostPointMessage()
+                    {
+                        Point = point
+                    }, nameof(PostPointMessage));
+                }
+            }
+        }
+
+        private int _CurrentTunnelStationLine = 0;
+        public int CurrentTunnelStationLine
+        {
+            get => _CurrentTunnelStationLine;
+            set
+            {
+                SetProperty(ref _CurrentTunnelStationLine, value);
+                OnPropertyChanged(nameof(IsLineSelected));
+
+                CurrentTunnelStation = 0;
+                if (_CurrentTunnelStationLine == 0)
+                {
+                    TunnelStationNames.Replace("(No Line Selected)");
+                }
+                else
+                {
+                    TunnelStationNames.Replace("Select Station...");
+                    TunnelStationNames.AddRange(
+                        TunnelStationLines[_CurrentTunnelStationLine - 1]
+                        .TunnelStations
+                        .Select(ts => ts.Name));
+                }
+                CurrentTunnelStation = 0;
+            }
+        }
+
+        public bool IsLineSelected => CurrentTunnelStationLine > 0;
+
         private TripPagePointsListService PointsListService { get; }
 
         private TripSettingsProvider TripSettingsProvider { get; }
 
-        private IConfiguration Config;
+        private IConfiguration Config { get; }
+
+        private TunnelStationLine[] TunnelStationLines { get; }
 
         public TripPageViewModel(IConfiguration config, TripPagePointsListService pointsListService, TripSettingsProvider tripSettingsProvider)
         {
@@ -67,6 +145,12 @@ namespace TripRecorder2.ViewModels
             StartStopCommand = new Command(StartStopRecording);
             FindTripByVehicleCommand = new Command(FindTripByVehicle);
             HandleReceivedMessages();
+
+            TunnelStationLines = Config.GetSection("tunnelStations").Get<TunnelStationLine[]>();
+            TunnelStationLineNames.Replace("Select Line...");
+            TunnelStationLineNames.AddRange(
+                TunnelStationLines
+                .Select(tsl => tsl.LineName));
         }
 
         public ICommand StartStopCommand { get; }
@@ -185,6 +269,8 @@ namespace TripRecorder2.ViewModels
                 return null;
             }
         }
+
+
 
         void HandleReceivedMessages()
         {
