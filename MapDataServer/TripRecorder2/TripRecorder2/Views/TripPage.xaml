@@ -35,10 +35,12 @@
                 </Grid.RowDefinitions>
                 <Picker ItemsSource="{Binding TunnelStationLineNames}" SelectedIndex="{Binding CurrentTunnelStationLine,Mode=TwoWay}"/>
 
-                <Button IsVisible="{Binding IsLineSelected}" Grid.Row="2"/>
+                <Button IsVisible="{Binding ShowPrevTunnelStation}" Grid.Row="2" Text="{Binding PrevTunnelStationName}"
+                        Command="{Binding GoToPrevTunnelStation}"/>
                 <Picker IsVisible="{Binding IsLineSelected}" Grid.Row="3"
                     ItemsSource="{Binding TunnelStationNames}" SelectedIndex="{Binding CurrentTunnelStation,Mode=TwoWay}"/>
-                <Button IsVisible="{Binding IsLineSelected}" Grid.Row="4"/>
+                <Button IsVisible="{Binding ShowNextTunnelStation}" Grid.Row="4" Text="{Binding NextTunnelStationName}"
+                        Command="{Binding GoToNextTunnelStation}"/>
             </Grid>
             <Grid Grid.Row="3" IsEnabled="{Binding CanSetTripDetails}">
                 <Grid.ColumnDefinitions>

@@ -79,6 +79,7 @@ namespace TripRecorder2.ViewModels
             set
             {
                 SetProperty(ref _CurrentTunnelStation, value);
+                UpdateNextPrevTunnelStations();
 
                 if (_CurrentTunnelStation > 0 &&
                     _CurrentTunnelStationLine > 0)
@@ -108,6 +109,7 @@ namespace TripRecorder2.ViewModels
             {
                 SetProperty(ref _CurrentTunnelStationLine, value);
                 OnPropertyChanged(nameof(IsLineSelected));
+                UpdateNextPrevTunnelStations();
 
                 CurrentTunnelStation = 0;
                 if (_CurrentTunnelStationLine == 0)
@@ -125,6 +127,59 @@ namespace TripRecorder2.ViewModels
                 CurrentTunnelStation = 0;
             }
         }
+
+        private TunnelStation GetAdjacentTunnelStation(bool next, out int index)
+        {
+            index = -1;
+            if (_CurrentTunnelStationLine > 0)
+            {
+                var currentLine = TunnelStationLines[CurrentTunnelStationLine - 1];
+                if (_CurrentTunnelStation <= 0)
+                {
+                    index = next ?
+                        currentLine.TunnelStations.Length - 1
+                        : 0;
+                    return currentLine.TunnelStations[index];
+                }
+                else
+                {
+                    index = next ?
+                        CurrentTunnelStation :
+                        CurrentTunnelStation - 2;
+                    if (index < 0)
+                        return null;
+                    else if (index >= currentLine.TunnelStations.Length)
+                        return null;
+                    return currentLine.TunnelStations[index];
+                }
+            }
+            else
+                return null;
+        }
+        private TunnelStation GetAdjacentTunnelStation(bool next) =>
+            GetAdjacentTunnelStation(next, out var _);
+
+        private void UpdateNextPrevTunnelStations()
+        {
+            OnPropertyChanged(nameof(NextTunnelStationName));
+            OnPropertyChanged(nameof(PrevTunnelStationName));
+            OnPropertyChanged(nameof(ShowNextTunnelStation));
+            OnPropertyChanged(nameof(ShowPrevTunnelStation));
+        }
+
+        private void GoToAdjacentTunnelStation(bool next)
+        {
+            GetAdjacentTunnelStation(next, out var index);
+            if (index > -1)
+                CurrentTunnelStation = index + 1;
+        }
+
+        public string NextTunnelStationName => GetAdjacentTunnelStation(true)?.Name;
+        public string PrevTunnelStationName => GetAdjacentTunnelStation(false)?.Name;
+        public bool ShowNextTunnelStation => GetAdjacentTunnelStation(true) != null;
+        public bool ShowPrevTunnelStation => GetAdjacentTunnelStation(false) != null;
+        public ICommand GoToNextTunnelStation { get; }
+        public ICommand GoToPrevTunnelStation { get; }
 
         public bool IsLineSelected => CurrentTunnelStationLine > 0;
 
@@ -151,6 +206,9 @@ namespace TripRecorder2.ViewModels
             TunnelStationLineNames.AddRange(
                 TunnelStationLines
                 .Select(tsl => tsl.LineName));
+
+            GoToNextTunnelStation = new Command(() => GoToAdjacentTunnelStation(true));
+            GoToPrevTunnelStation = new Command(() => GoToAdjacentTunnelStation(false));
         }
 
         public ICommand StartStopCommand { get; }
