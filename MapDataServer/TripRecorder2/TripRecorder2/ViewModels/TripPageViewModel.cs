@@ -12,6 +12,7 @@ using System.Xml;
 using System.Xml.Serialization;
 using TripRecorder2.Models;
 using TripRecorder2.Services;
+using Xamarin.Essentials;
 using Xamarin.Forms;
 
 namespace TripRecorder2.ViewModels
@@ -43,6 +44,13 @@ namespace TripRecorder2.ViewModels
                 _IsInProgress = value;
                 CanSetTripDetails = !value;
             }
+        }
+
+        private bool _CanResumeTrip = false;
+        public bool CanResumeTrip
+        {
+            get => _CanResumeTrip;
+            set => SetProperty(ref _CanResumeTrip, value);
         }
 
         private bool _CanSetTripDetails = true;
@@ -197,6 +205,7 @@ namespace TripRecorder2.ViewModels
             PointsListService = pointsListService;
             TripSettingsProvider = tripSettingsProvider;
             Title = "Current Trip";
+            ResumeTripCommand = new Command(ResumeTrip);
             StartStopCommand = new Command(StartStopRecording);
             FindTripByVehicleCommand = new Command(FindTripByVehicle);
             HandleReceivedMessages();
@@ -209,7 +218,17 @@ namespace TripRecorder2.ViewModels
 
             GoToNextTunnelStation = new Command(() => GoToAdjacentTunnelStation(true));
             GoToPrevTunnelStation = new Command(() => GoToAdjacentTunnelStation(false));
+
+            var tripIdA = Preferences.Get("currentTrip:tripIdA", 0);
+            var tripIdB = Preferences.Get("currentTrip:tripIdB", 0);
+            var tripId = LongHelpers.ToLong(tripIdA, tripIdB);
+
+            CanResumeTrip = Preferences.Get("currentTrip:inProgress", false) && tripId != 0;
+            
+            Console.WriteLine($"Current trip: {tripId}, {tripIdA}, {tripIdB}");
         }
+
+        public ICommand ResumeTripCommand { get; }
 
         public ICommand StartStopCommand { get; }
 
@@ -276,8 +295,32 @@ namespace TripRecorder2.ViewModels
             set => SetProperty(ref _VehicleId, value);
         }
 
+        public void ResumeTrip()
+        {
+            CanResumeTrip = false;
+            PointsListService.Reset();
+            ShowPointsOnMap();
+            var message = new StartLongRunningTaskMessage();
+
+            var tripIdA = Preferences.Get("currentTrip:tripIdA", 0);
+            var tripIdB = Preferences.Get("currentTrip:tripIdB", 0);
+            TripSettingsProvider.ResumingTripId = LongHelpers.ToLong(tripIdA, tripIdB);
+            CurrentVehicleType = Preferences.Get("currentTrip:vehicleType", "");
+            CurrentHovStatus = (HovStatus)Preferences.Get("currentTrip:hovStatus", 0);
+            CurrentTripId = Preferences.Get("currentTrip:tripId", "");
+            VehicleId = Preferences.Get("currentTrip:vehicleId", "");
+
+            TripSettingsProvider.HovStatus = CurrentHovStatus;
+            TripSettingsProvider.VehicleType = string.IsNullOrEmpty(CurrentVehicleType) ? null : CurrentVehicleType;
+            TripSettingsProvider.ObaTripId = string.IsNullOrEmpty(CurrentTripId) ? null : CurrentTripId;
+            TripSettingsProvider.ObaVehicleId = string.IsNullOrEmpty(VehicleId) ? null : VehicleId;
+            MessagingCenter.Send(message, "StartLongRunningTaskMessage");
+            IsInProgress = true;
+        }
+
         public void StartStopRecording()
         {
+            CanResumeTrip = false;
             if (IsInProgress)
             {
                 var message = new StopLongRunningTaskMessage();
@@ -290,6 +333,7 @@ namespace TripRecorder2.ViewModels
                 PointsListService.Reset();
                 ShowPointsOnMap();
                 var message = new StartLongRunningTaskMessage();
+                TripSettingsProvider.ResumingTripId = null;
                 TripSettingsProvider.HovStatus = CurrentHovStatus;
                 TripSettingsProvider.VehicleType = string.IsNullOrEmpty(CurrentVehicleType) ? null : CurrentVehicleType;
                 TripSettingsProvider.ObaTripId = string.IsNullOrEmpty(CurrentTripId) ? null : CurrentTripId;

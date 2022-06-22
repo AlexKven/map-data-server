@@ -11,5 +11,6 @@ namespace TripRecorder2.Services
         public HovStatus HovStatus { get; set; }
         public string ObaTripId { get; set; }
         public string ObaVehicleId { get; set; }
+        public long? ResumingTripId { get; set; }
     }
 }

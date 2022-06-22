@@ -12,6 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TripRecorder2.Models;
+using Xamarin.Essentials;
 using Xamarin.Forms;
 
 namespace TripRecorder2.Services
@@ -62,21 +63,49 @@ namespace TripRecorder2.Services
             {
                 SendMessage("Starting new trip...");
 
-                var trip = new Trip()
+                if (TripSettingsProvider.ResumingTripId.HasValue)
                 {
-                    HovStatus = TripSettingsProvider.HovStatus,
-                    VehicleType = TripSettingsProvider.VehicleType,
-                    StartTime = DateTime.UtcNow
-                };
-                do
+                    Console.WriteLine($"Resuming trip {TripSettingsProvider.ResumingTripId}");
+                    CurrentTrip = new Trip()
+                    {
+                        Id = TripSettingsProvider.ResumingTripId.Value,
+                        HovStatus = TripSettingsProvider.HovStatus,
+                        VehicleType = TripSettingsProvider.VehicleType,
+                        StartTime = DateTime.UtcNow
+                    };
+                }
+                else
                 {
-                    CurrentTrip = await PostObject(trip, "trip/start");
-                } while (CurrentTrip == null);
+                    var trip = new Trip()
+                    {
+                        HovStatus = TripSettingsProvider.HovStatus,
+                        VehicleType = TripSettingsProvider.VehicleType,
+                        StartTime = DateTime.UtcNow
+                    };
+                    do
+                    {
+                        CurrentTrip = await PostObject(trip, "trip/start");
+                    } while (CurrentTrip == null);
 
-                if (TripSettingsProvider.ObaTripId != null)
-                {
-                    int attempt = 0;
-                    while (!(await SetObaDetails()) && attempt++ < 10) ;
+
+                    Device.BeginInvokeOnMainThread(() =>
+                    {
+                        Preferences.Set("currentTrip:inProgress", true);
+                        var (a, b) = LongHelpers.ToInts(CurrentTrip.Id);
+                        Preferences.Set("currentTrip:tripIdA", a);
+                        Preferences.Set("currentTrip:tripIdB", b);
+                        Preferences.Set("currentTrip:vehicleType", CurrentTrip.VehicleType);
+                        Preferences.Set("currentTrip:hovStatus", (int)CurrentTrip.HovStatus);
+                        Preferences.Set("currentTrip:tripId", TripSettingsProvider.ObaTripId);
+                        Preferences.Set("currentTrip:vehicleId", TripSettingsProvider.ObaVehicleId);
+                        Console.WriteLine($"New trip: {CurrentTrip.Id}, {Preferences.Get("currentTrip:tripIdA", 0)}, {Preferences.Get("currentTrip:tripIdB", 0)}");
+                    });
+
+                    if (TripSettingsProvider.ObaTripId != null)
+                    {
+                        int attempt = 0;
+                        while (!(await SetObaDetails()) && attempt++ < 10) ;
+                    }
                 }
 
                 await LocationProvider.CheckPermission();
@@ -188,10 +217,22 @@ namespace TripRecorder2.Services
 
         private async Task EndTrip()
         {
+            Console.WriteLine($"Ending trip {CurrentTrip?.Id}");
             if (CurrentTrip == null)
                 return;
             var request = new HttpRequestMessage(HttpMethod.Post, $"{Config["server"]}/trip/end?tripId={CurrentTrip.Id}&endTime={DateTime.UtcNow.ToString("s", CultureInfo.InvariantCulture)}");
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Config["apikey"]);
+
+            Device.BeginInvokeOnMainThread(() =>
+            {
+                Preferences.Set("currentTrip:inProgress", false);
+                Preferences.Set("currentTrip:tripIdA", 0);
+                Preferences.Set("currentTrip:tripIdB", 0);
+                Preferences.Set("currentTrip:vehicleType", "");
+                Preferences.Set("currentTrip:hovStatus", (int)CurrentTrip.HovStatus);
+                Preferences.Set("currentTrip:tripId", "");
+                Preferences.Set("currentTrip:vehicleId", "");
+            });
 
             try
             {

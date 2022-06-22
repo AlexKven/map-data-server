@@ -60,10 +60,12 @@
                 <Button Text="Get trip by vehicle" Command="{Binding FindTripByVehicleCommand}" Grid.Column="1"/>
                 <Entry Placeholder="Vehicle ID" Text="{Binding VehicleId}" Grid.Column="2"/>
             </Grid>
-            <Button Grid.Row="5" HorizontalOptions="Center"
-                    Text="{Binding StartStopButtonText}"
+            <StackLayout Grid.Row="5" Orientation="Horizontal" HorizontalOptions="Center">
+                <Button Text="{Binding StartStopButtonText}"
                     Command="{Binding StartStopCommand}"
                     IsEnabled="{Binding IsStartStopButtonEnabled}"/>
+                <Button Text="Resume Trip" Command="{Binding ResumeTripCommand}" IsVisible="{Binding CanResumeTrip}" />
+            </StackLayout>
         </Grid>
     </ContentPage.Content>
 </ContentPage>
