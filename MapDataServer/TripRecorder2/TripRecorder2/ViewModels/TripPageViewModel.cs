@@ -338,6 +338,7 @@ namespace TripRecorder2.ViewModels
                 TripSettingsProvider.VehicleType = string.IsNullOrEmpty(CurrentVehicleType) ? null : CurrentVehicleType;
                 TripSettingsProvider.ObaTripId = string.IsNullOrEmpty(CurrentTripId) ? null : CurrentTripId;
                 TripSettingsProvider.ObaVehicleId = string.IsNullOrEmpty(VehicleId) ? null : VehicleId;
+                TripSettingsProvider.StartInTunnelMode = IsInTunnelMode;
                 MessagingCenter.Send(message, "StartLongRunningTaskMessage");
                 IsInProgress = true;
             }

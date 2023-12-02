@@ -1,9 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
-    <SelectedDevice>OnePlus A5010</SelectedDevice>
+    <SelectedDevice>OnePlus CPH2451</SelectedDevice>
     <AndroidDesignerPreferredTheme>Theme.AppCompat.Light.NoActionBar</AndroidDesignerPreferredTheme>
     <DefaultDevice>pixel_5_-_api_30</DefaultDevice>
-    <ActiveDebugProfile>OnePlus A5010</ActiveDebugProfile>
+    <ActiveDebugProfile>OnePlus CPH2451 %28Android 13.0 - API 33%29</ActiveDebugProfile>
+    <SelectedPlatformGroup>PhysicalDevice</SelectedPlatformGroup>
   </PropertyGroup>
 </Project>

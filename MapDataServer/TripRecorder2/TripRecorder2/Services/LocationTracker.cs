@@ -1,4 +1,5 @@
-﻿using MapDataServer.Models;
+﻿using MapDataServer.Helpers;
+using MapDataServer.Models;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Plugin.Geolocator;
@@ -7,6 +8,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
@@ -21,7 +23,9 @@ namespace TripRecorder2.Services
     {
         private ILocationProvider LocationProvider { get; }
         private HttpClient HttpClient { get; }
-        private ConcurrentQueue<TripPoint> PendingPoints { get; } = new ConcurrentQueue<TripPoint>();
+        private readonly ConcurrentQueue<TripPoint> PendingPoints = new ConcurrentQueue<TripPoint>();
+        private List<TripPoint> QualityBuffer { get; } = new List<TripPoint>();
+        private const int QualityBufferSize = 9;
         private IConfiguration Config { get; }
         private TripPagePointsListService PointsListService { get; }
         private TripSettingsProvider TripSettingsProvider { get; }
@@ -36,6 +40,8 @@ namespace TripRecorder2.Services
             PointsListService = pointsListService;
             TripSettingsProvider = tripSettingsProvider;
         }
+
+
 
         private object SettingsLock = new object();
         private bool _IsInTunnelMode = false;
@@ -52,6 +58,11 @@ namespace TripRecorder2.Services
             {
                 lock (SettingsLock)
                 {
+                    if (!_IsInTunnelMode && value)
+                    {
+                        ProcessPoint(null, true);
+                        BufferStarted = false;
+                    }
                     _IsInTunnelMode = value;
                 }
             }
@@ -63,6 +74,7 @@ namespace TripRecorder2.Services
             {
                 SendMessage("Starting new trip...");
 
+                IsInTunnelMode = TripSettingsProvider.StartInTunnelMode;
                 if (TripSettingsProvider.ResumingTripId.HasValue)
                 {
                     Console.WriteLine($"Resuming trip {TripSettingsProvider.ResumingTripId}");
@@ -115,7 +127,7 @@ namespace TripRecorder2.Services
                 await locator.StartListeningAsync(TimeSpan.FromSeconds(15), 15, true,
                     new ListenerSettings()
                     {
-                        ActivityType = ActivityType.AutomotiveNavigation,
+                        ActivityType = TripSettingsProvider.HovStatus == HovStatus.Pedestrian ? ActivityType.Fitness : ActivityType.AutomotiveNavigation,
                         AllowBackgroundUpdates = true,
                         DeferLocationUpdates = false,
                         ListenForSignificantChanges = false,
@@ -135,27 +147,220 @@ namespace TripRecorder2.Services
                 finally
                 {
                     await locator.StopListeningAsync();
+                    ProcessPoint(null, true);
                     await SendPendingPoints();
                     await EndTrip();
                 }
             }, token);
         }
 
-        public void ManuallyPostPoint(TripPoint point)
+        public void ManuallyPostPoint(TripPoint point, bool showMessage = true)
         {
-            point.Time = DateTime.Now;
             point.TripId = CurrentTrip?.Id ?? 0;
 
             PendingPoints.Enqueue(point);
             PointsListService.TripPagePoints.Enqueue(point);
+            if (showMessage)
+                SendMessage($"Point: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
+        }
 
-            SendMessage($"Point: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
+        private static bool IsBadPoint(TripPoint current, List<TripPoint> prev, List<TripPoint> next)
+        {
+            // It is a bad point if
+            // angle is < 15 for first test
+            // angle threshold increases by 5 for subsequent tests
+            var testCount = Math.Min(prev.Count, next.Count);
+
+            var totalAngle = 0.0;
+            var totalAngles = 0;
+            for (var t = 0; t < testCount; t++)
+            {
+                var sideA = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, prev[t].Latitude, prev[t].Longitude);
+                var sideB = GeometryHelpers.GetDistance(prev[t].Latitude, prev[t].Longitude, current.Latitude, current.Longitude);
+                var sideC = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, current.Latitude, current.Longitude);
+                var angle = GeometryHelpers.GetTriangleAngleA(sideA, sideB, sideC);
+                if (angle.HasValue)
+                {
+                    totalAngle++;
+                    totalAngle += angle.Value;
+                }
+
+                if (totalAngles > 0 && (totalAngles / totalAngles) < 15 + 5 * t)
+                    return true;
+            }
+            return false;
+        }
+
+        private void ProcessPoint(TripPoint point, bool ending)
+        {
+            string QBS() => string.Join(", ", QualityBuffer.Select(p => string.Format("{0:0.00}", p.RangeRadius)));
+            try
+            {
+                var log = new StringBuilder(QBS());
+                var starting = !BufferStarted;
+                lock (QualityBuffer)
+                {
+                    if (point != null)
+                    {
+                        point.Time = DateTime.Now;
+                        QualityBuffer.Add(point);
+                        while (QualityBuffer.Count > QualityBufferSize)
+                        {
+                            var next = QualityBuffer[0];
+                            ManuallyPostPoint(next, false);
+                            log.AppendLine();
+                            log.Append($"Post:{next.RangeRadius:0.0}");
+                            QualityBuffer.RemoveAt(0);
+                        }
+                        //SendMessage($"Point: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
+                    }
+                    log.AppendLine();
+                    log.Append(QBS());
+
+                    if (QualityBuffer.Count == 0)
+                        return;
+
+                    var minRadius = QualityBuffer.Select(p => p.RangeRadius).Min();
+                    log.AppendLine();
+                    log.Append($"Min:{minRadius:0.0}");
+
+                    bool ShouldFilterPoint(int bufferIndex)
+                    {
+                        var filterPoint = QualityBuffer[bufferIndex];
+                        if (filterPoint.RangeRadius > minRadius * 4)
+                            return true;
+                        if (QualityBuffer.Count > 1)
+                        {
+                            var radiiSum = 0.0;
+                            for (int i = 0; i < QualityBuffer.Count; i++)
+                            {
+                                if (i != bufferIndex)
+                                    radiiSum += QualityBuffer[i].RangeRadius;
+                            }
+                            var avgRadius = radiiSum / (QualityBuffer.Count - 1);
+                            log.Append($", Avg:{avgRadius:0.0}");
+                            if (filterPoint.RangeRadius > avgRadius * 1.5)
+                            {
+                                log.Append($", Rem:{bufferIndex}");
+                                return true;
+                            }
+
+                            var prev = new List<TripPoint>();
+                            var next = new List<TripPoint>();
+                            for (int i = 0; i <= bufferIndex; i++)
+                            {
+                                var p = bufferIndex - i;
+                                var n = bufferIndex + i;
+                                if (p >= 0)
+                                    prev.Add(QualityBuffer[p]);
+                                if (n < QualityBuffer.Count)
+                                    prev.Add(QualityBuffer[n]);
+                            }
+                            if (IsBadPoint(filterPoint, prev, next))
+                                return true;
+                        }
+                        return false;
+                    }
+
+                    var indicesToFilter = new List<int>();
+
+                    var middleIndex = QualityBuffer.Count / 2;
+                    if (QualityBuffer.Count >= QualityBufferSize)
+                    {
+                        var dupes = new List<(double lat, double lon, double range, List<int> indices)>();
+                        for (var i = 0; i < QualityBuffer.Count; i++)
+                        {
+                            var curP = QualityBuffer[i];
+                            var found = -1;
+                            for (var j = 0; j < dupes.Count; j++)
+                            {
+                                if (found >= 0)
+                                    continue;
+                                var curD = dupes[j];
+                                if (Math.Abs(curD.lat - curP.Latitude) < 0.0001 &&
+                                    Math.Abs(curD.lon - curP.Longitude) < 0.0001 &&
+                                    Math.Abs(curD.range - curP.RangeRadius) < 1)
+                                    found = j;
+                            }
+                            if (found >= 0)
+                                dupes[found].indices.Add(i);
+                        }
+                        foreach (var dupe in dupes)
+                        {
+                            if (dupe.indices.Count >= 3)
+                            {
+                                indicesToFilter.AddRange(dupe.indices);
+                            }
+                        }
+                        indicesToFilter.Sort();
+
+                        for (var i = indicesToFilter.Count - 1; i >= 0; i--)
+                        {
+                            QualityBuffer.RemoveAt(indicesToFilter[i]);
+                        }
+                        indicesToFilter.Clear();
+                    }
+                    if (QualityBuffer.Count >= QualityBufferSize)
+                    {
+                        if (starting)
+                        {
+                            for (var i = 0; i < middleIndex; i++)
+                            {
+                                if (ShouldFilterPoint(i))
+                                    indicesToFilter.Insert(0, i);
+                            }
+                            BufferStarted = true;
+                        }
+                        if (ShouldFilterPoint(middleIndex))
+                            indicesToFilter.Insert(0, middleIndex);
+                        if (ending && QualityBuffer.Count > middleIndex + 1)
+                        {
+                            for (var i = middleIndex + 1; i < QualityBuffer.Count; i++)
+                            {
+                                if (ShouldFilterPoint(i))
+                                    indicesToFilter.Insert(0, i);
+                            }
+                        }
+                    }
+                    else if (ending)
+                    {
+                        for (var i = 0; i < QualityBuffer.Count; i++)
+                        {
+                            if (ShouldFilterPoint(i))
+                                indicesToFilter.Insert(0, i);
+                        }
+                    }
+
+                    foreach (var index in indicesToFilter)
+                    {
+                        QualityBuffer.RemoveAt(index);
+                    }
+                    indicesToFilter.Clear();
+
+                    if (ending)
+                    {
+                        foreach (var p in QualityBuffer)
+                        {
+                            ManuallyPostPoint(p, false);
+                        }
+                        QualityBuffer.Clear();
+                    }
+                    log.AppendLine();
+                    log.Append(QBS());
+                    SendMessage(log.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                SendMessage(ex.ToString());
+            }
         }
 
         private void Locator_PositionError(object sender, PositionErrorEventArgs e)
         {
         }
 
+        bool BufferStarted = false;
         private void Locator_PositionChanged(object sender, PositionEventArgs e)
         {
             if (!IsInTunnelMode)
@@ -168,7 +373,7 @@ namespace TripRecorder2.Services
                     Latitude = position.Latitude,
                     RangeRadius = position.Accuracy
                 };
-                ManuallyPostPoint(point);
+                ProcessPoint(point, false);
             }
         }
 

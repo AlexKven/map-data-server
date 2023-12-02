@@ -39,7 +39,7 @@ namespace TripRecorder2.Droid.Services
 
         public override StartCommandResult OnStartCommand(Intent intent, StartCommandFlags flags, int startId)
         {
-            if (intent.Action == Constants.ACTION_END_TRIP)
+            if (intent?.Action == Constants.ACTION_END_TRIP)
             {
                 StopSelf();
             }

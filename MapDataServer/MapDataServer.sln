@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.28729.10
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31912.275
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MapDataServer", "MapDataServer\MapDataServer.csproj", "{0F25A7BE-2B24-463F-A0F0-834D66E4568C}"
 EndProject
@@ -22,18 +22,6 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TripRecorder2", "TripRecorder2\TripRecorder2\TripRecorder2.csproj", "{D6951938-7A44-474E-B82E-80BB2CE96860}"
 EndProject
 Global
-	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		ClientServerShared\ClientServerShared.projitems*{0f25a7be-2b24-463f-a0f0-834d66e4568c}*SharedItemsImports = 5
-		ClientServerShared\ClientServerShared.projitems*{544fd1f7-28fb-436e-9510-317944b3d935}*SharedItemsImports = 13
-		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{6279c845-92f8-4333-ab99-3d213163593c}*SharedItemsImports = 13
-		ClientServerShared\ClientServerShared.projitems*{7b3edb29-eecd-4a81-963a-55107c85590f}*SharedItemsImports = 4
-		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{7b3edb29-eecd-4a81-963a-55107c85590f}*SharedItemsImports = 4
-		ClientServerShared\ClientServerShared.projitems*{7d945523-1ec2-459d-8bdc-083a74484d4e}*SharedItemsImports = 4
-		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{7d945523-1ec2-459d-8bdc-083a74484d4e}*SharedItemsImports = 4
-		ClientServerShared\ClientServerShared.projitems*{c67bbe47-a7bd-4b60-b566-532403e00358}*SharedItemsImports = 4
-		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{c67bbe47-a7bd-4b60-b566-532403e00358}*SharedItemsImports = 4
-		ClientServerShared\ClientServerShared.projitems*{d6951938-7a44-474e-b82e-80bb2ce96860}*SharedItemsImports = 5
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Ad-Hoc|Any CPU = Ad-Hoc|Any CPU
 		Ad-Hoc|ARM = Ad-Hoc|ARM
@@ -447,5 +435,17 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {85C2F347-A2B8-4876-89A1-3F0AE68D4693}
+	EndGlobalSection
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		ClientServerShared\ClientServerShared.projitems*{0f25a7be-2b24-463f-a0f0-834d66e4568c}*SharedItemsImports = 5
+		ClientServerShared\ClientServerShared.projitems*{544fd1f7-28fb-436e-9510-317944b3d935}*SharedItemsImports = 13
+		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{6279c845-92f8-4333-ab99-3d213163593c}*SharedItemsImports = 13
+		ClientServerShared\ClientServerShared.projitems*{7d945523-1ec2-459d-8bdc-083a74484d4e}*SharedItemsImports = 4
+		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{7d945523-1ec2-459d-8bdc-083a74484d4e}*SharedItemsImports = 4
+		ClientServerShared\ClientServerShared.projitems*{c67bbe47-a7bd-4b60-b566-532403e00358}*SharedItemsImports = 4
+		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{c67bbe47-a7bd-4b60-b566-532403e00358}*SharedItemsImports = 4
+		ClientServerShared\ClientServerShared.projitems*{d6951938-7a44-474e-b82e-80bb2ce96860}*SharedItemsImports = 5
+		ClientServerShared\ClientServerShared.projitems*{ee5e363f-40db-423e-9793-40a62b3b1238}*SharedItemsImports = 5
+		TripRecorder\TripRecorder.Shared\TripRecorder.Shared.projitems*{ee5e363f-40db-423e-9793-40a62b3b1238}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

@@ -12,5 +12,6 @@ namespace TripRecorder2.Services
         public string ObaTripId { get; set; }
         public string ObaVehicleId { get; set; }
         public long? ResumingTripId { get; set; }
+        public bool StartInTunnelMode { get; set; }
     }
 }
