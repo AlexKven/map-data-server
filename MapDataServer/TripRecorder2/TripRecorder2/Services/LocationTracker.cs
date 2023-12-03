@@ -13,6 +13,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Transactions;
 using TripRecorder2.Models;
 using Xamarin.Essentials;
 using Xamarin.Forms;
@@ -171,21 +172,56 @@ namespace TripRecorder2.Services
             // angle threshold increases by 5 for subsequent tests
             var testCount = Math.Min(prev.Count, next.Count);
 
-            var totalAngle = 0.0;
-            var totalAngles = 0;
-            for (var t = 0; t < testCount; t++)
-            {
-                var sideA = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, prev[t].Latitude, prev[t].Longitude);
-                var sideB = GeometryHelpers.GetDistance(prev[t].Latitude, prev[t].Longitude, current.Latitude, current.Longitude);
-                var sideC = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, current.Latitude, current.Longitude);
-                var angle = GeometryHelpers.GetTriangleAngleA(sideA, sideB, sideC);
-                if (angle.HasValue)
-                {
-                    totalAngle++;
-                    totalAngle += angle.Value;
-                }
+            double Dist(TripPoint first, TripPoint second) => GeometryHelpers.GetDistance(first.Latitude, first.Longitude, second.Latitude, second.Longitude);
+            double Time(TripPoint first, TripPoint second) => (second.Time - first.Time).TotalSeconds;
 
-                if (totalAngles > 0 && (totalAngles / totalAngles) < 15 + 5 * t)
+            //var totalAngle = 0.0;
+            //var totalAngles = 0;
+            //for (var t = 0; t < testCount; t++)
+            //{
+            //    var sideA = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, prev[t].Latitude, prev[t].Longitude);
+            //    var sideB = GeometryHelpers.GetDistance(prev[t].Latitude, prev[t].Longitude, current.Latitude, current.Longitude);
+            //    var sideC = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, current.Latitude, current.Longitude);
+            //    var angle = GeometryHelpers.GetTriangleAngleA(sideA, sideB, sideC);
+            //    if (angle.HasValue)
+            //    {
+            //        totalAngle++;
+            //        totalAngle += angle.Value;
+            //    }
+
+            //    if (totalAngles > 0 && (totalAngle / totalAngles) * 180 / Math.PI < 15 + 5 * t)
+            //        return true;
+            //}
+            if (prev.Any() && next.Any())
+            {
+                var combined = ((IEnumerable<TripPoint>)prev).Reverse().Concat(next);
+                TripPoint last = null;
+                var length = 0.0;
+                var combinedRadius = 0.0;
+                var count = 0;
+                foreach (var cur in combined)
+                {
+                    combinedRadius += cur.RangeRadius;
+                    if (last != null)
+                    {
+                        length += Dist(last, cur);
+                        count++;
+                    }
+                    last = cur;
+                }
+                var avgSpeed = length / Time(combined.First(), combined.Last());
+                var avgDist = length / count;
+                var avgRadius = combinedRadius / (count + 1);
+
+                var outDist = Dist(prev[0], current);
+                var outSpeed = outDist / Time(prev[0], current);
+                var inDist = Dist(current, next[0]);
+                var inSpeed = inDist / Time(current, next[0]);
+                if (outSpeed > 3 * avgSpeed || inSpeed > 3 * avgSpeed)
+                    return true;
+
+                var distFactor = 1 + avgRadius / current.RangeRadius;
+                if (outDist > distFactor * avgDist ||  inDist > distFactor * avgDist)
                     return true;
             }
             return false;
@@ -254,7 +290,7 @@ namespace TripRecorder2.Services
                                 if (p >= 0)
                                     prev.Add(QualityBuffer[p]);
                                 if (n < QualityBuffer.Count)
-                                    prev.Add(QualityBuffer[n]);
+                                    next.Add(QualityBuffer[n]);
                             }
                             if (IsBadPoint(filterPoint, prev, next))
                                 return true;
@@ -284,6 +320,8 @@ namespace TripRecorder2.Services
                             }
                             if (found >= 0)
                                 dupes[found].indices.Add(i);
+                            else
+                                dupes.Add((lat: curP.Latitude, lon: curP.Longitude, range: curP.RangeRadius, indices: new List<int>() { i }));
                         }
                         foreach (var dupe in dupes)
                         {
