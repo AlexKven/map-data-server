@@ -380,7 +380,7 @@ namespace TripRecorder2.ViewModels
             MessagingCenter.Subscribe<TickedMessage>(this, "TickedMessage", message => {
                 Device.BeginInvokeOnMainThread(() => {
                     DisplayMessage = message.Message;
-                    if (DisplayMessage.StartsWith("Point:"))
+                    if (DisplayMessage.Contains("POST:"))
                     {
                         ShowPointsOnMap();
                     }

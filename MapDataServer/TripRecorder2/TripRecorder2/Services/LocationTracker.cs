@@ -162,36 +162,26 @@ namespace TripRecorder2.Services
             PendingPoints.Enqueue(point);
             PointsListService.TripPagePoints.Enqueue(point);
             if (showMessage)
-                SendMessage($"Point: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
+                SendMessage($"POST: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
         }
 
-        private static bool IsBadPoint(TripPoint current, List<TripPoint> prev, List<TripPoint> next)
+        private List<TripPoint>[] RemovedPointLogs = new List<TripPoint>[]
         {
-            // It is a bad point if
-            // angle is < 15 for first test
-            // angle threshold increases by 5 for subsequent tests
+            new List<TripPoint>(),
+            new List<TripPoint>(),
+            new List<TripPoint>(),
+            new List<TripPoint>(),
+            new List<TripPoint>(),
+            new List<TripPoint>(),
+        };
+
+        private static double Dist(TripPoint first, TripPoint second) => GeometryHelpers.GetDistance(first.Latitude, first.Longitude, second.Latitude, second.Longitude);
+        private static double Time(TripPoint first, TripPoint second) => (second.Time - first.Time).TotalSeconds;
+
+        private bool IsBadPoint(TripPoint current, List<TripPoint> prev, List<TripPoint> next)
+        {
             var testCount = Math.Min(prev.Count, next.Count);
 
-            double Dist(TripPoint first, TripPoint second) => GeometryHelpers.GetDistance(first.Latitude, first.Longitude, second.Latitude, second.Longitude);
-            double Time(TripPoint first, TripPoint second) => (second.Time - first.Time).TotalSeconds;
-
-            //var totalAngle = 0.0;
-            //var totalAngles = 0;
-            //for (var t = 0; t < testCount; t++)
-            //{
-            //    var sideA = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, prev[t].Latitude, prev[t].Longitude);
-            //    var sideB = GeometryHelpers.GetDistance(prev[t].Latitude, prev[t].Longitude, current.Latitude, current.Longitude);
-            //    var sideC = GeometryHelpers.GetDistance(next[t].Latitude, next[t].Longitude, current.Latitude, current.Longitude);
-            //    var angle = GeometryHelpers.GetTriangleAngleA(sideA, sideB, sideC);
-            //    if (angle.HasValue)
-            //    {
-            //        totalAngle++;
-            //        totalAngle += angle.Value;
-            //    }
-
-            //    if (totalAngles > 0 && (totalAngle / totalAngles) * 180 / Math.PI < 15 + 5 * t)
-            //        return true;
-            //}
             if (prev.Any() && next.Any())
             {
                 var combined = ((IEnumerable<TripPoint>)prev).Reverse().Concat(next);
@@ -218,11 +208,17 @@ namespace TripRecorder2.Services
                 var inDist = Dist(current, next[0]);
                 var inSpeed = inDist / Time(current, next[0]);
                 if (outSpeed > 3 * avgSpeed || inSpeed > 3 * avgSpeed)
+                {
+                    RemovedPointLogs[4].Add(current);
                     return true;
+                }
 
-                var distFactor = 1 + avgRadius / current.RangeRadius;
-                if (outDist > distFactor * avgDist ||  inDist > distFactor * avgDist)
+                var distFactor = 1.5 + avgRadius / current.RangeRadius;
+                if (outDist > distFactor * avgDist || inDist > distFactor * avgDist)
+                {
+                    RemovedPointLogs[5].Add(current);
                     return true;
+                }
             }
             return false;
         }
@@ -245,7 +241,7 @@ namespace TripRecorder2.Services
                             var next = QualityBuffer[0];
                             ManuallyPostPoint(next, false);
                             log.AppendLine();
-                            log.Append($"Post:{next.RangeRadius:0.0}");
+                            log.Append($"POST: {next.RangeRadius:0.0}");
                             QualityBuffer.RemoveAt(0);
                         }
                         //SendMessage($"Point: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
@@ -264,7 +260,10 @@ namespace TripRecorder2.Services
                     {
                         var filterPoint = QualityBuffer[bufferIndex];
                         if (filterPoint.RangeRadius > minRadius * 4)
+                        {
+                            RemovedPointLogs[2].Add(filterPoint);
                             return true;
+                        }
                         if (QualityBuffer.Count > 1)
                         {
                             var radiiSum = 0.0;
@@ -278,6 +277,7 @@ namespace TripRecorder2.Services
                             if (filterPoint.RangeRadius > avgRadius * 1.5)
                             {
                                 log.Append($", Rem:{bufferIndex}");
+                                RemovedPointLogs[3].Add(filterPoint);
                                 return true;
                             }
 
@@ -293,7 +293,9 @@ namespace TripRecorder2.Services
                                     next.Add(QualityBuffer[n]);
                             }
                             if (IsBadPoint(filterPoint, prev, next))
+                            {
                                 return true;
+                            }
                         }
                         return false;
                     }
@@ -334,9 +336,51 @@ namespace TripRecorder2.Services
 
                         for (var i = indicesToFilter.Count - 1; i >= 0; i--)
                         {
-                            QualityBuffer.RemoveAt(indicesToFilter[i]);
+                            var index = indicesToFilter[i];
+                            RemovedPointLogs[0].Add(QualityBuffer[index]);
+                            QualityBuffer.RemoveAt(index);
                         }
                         indicesToFilter.Clear();
+                    }
+                    if (QualityBuffer.Count >= QualityBufferSize)
+                    {
+                        var overlapPadding = 2;
+                        double largestOverlapping;
+                        int largestOverlappingInd;
+                        do
+                        {
+                            largestOverlapping = 0;
+                            largestOverlappingInd = -1;
+                            for (var i = overlapPadding; i < QualityBuffer.Count - overlapPadding; i++)
+                            {
+                                for (var j = i; j < QualityBuffer.Count - overlapPadding; j++)
+                                {
+                                    if (j == i)
+                                        continue;
+                                    var pointI = QualityBuffer[i];
+                                    var pointJ = QualityBuffer[j];
+                                    if (Dist(pointI, pointJ) < pointI.RangeRadius + pointJ.RangeRadius)
+                                    {
+                                        if (pointI.RangeRadius > largestOverlapping)
+                                        {
+                                            largestOverlapping = pointI.RangeRadius;
+                                            largestOverlappingInd = i;
+                                        }
+                                        if (pointJ.RangeRadius > largestOverlapping)
+                                        {
+                                            largestOverlapping = pointJ.RangeRadius;
+                                            largestOverlappingInd = j;
+                                        }
+                                    }
+                                }
+                            }
+                            if (largestOverlappingInd >= 0)
+                            {
+                                RemovedPointLogs[1].Add(QualityBuffer[largestOverlappingInd]);
+                                QualityBuffer.RemoveAt(largestOverlappingInd);
+                            }
+
+                        } while (largestOverlappingInd >= 0);
                     }
                     if (QualityBuffer.Count >= QualityBufferSize)
                     {
@@ -385,6 +429,9 @@ namespace TripRecorder2.Services
                     }
                     log.AppendLine();
                     log.Append(QBS());
+                    log.AppendLine();
+                    log.Append("LOG: ");
+                    log.Append(string.Join(", ", RemovedPointLogs.Select(l => l.Count)));
                     SendMessage(log.ToString());
                 }
             }
