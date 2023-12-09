@@ -17,6 +17,7 @@ using System.Transactions;
 using TripRecorder2.Models;
 using Xamarin.Essentials;
 using Xamarin.Forms;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace TripRecorder2.Services
 {
@@ -41,8 +42,6 @@ namespace TripRecorder2.Services
             PointsListService = pointsListService;
             TripSettingsProvider = tripSettingsProvider;
         }
-
-
 
         private object SettingsLock = new object();
         private bool _IsInTunnelMode = false;
@@ -69,11 +68,26 @@ namespace TripRecorder2.Services
             }
         }
 
+        private bool _areEventsRegistered = false;
+        private void RegisterEvents(IGeolocator locator)
+        {
+            if (!_areEventsRegistered)
+            {
+                locator.PositionChanged += Locator_PositionChanged;
+                locator.PositionError += Locator_PositionError;
+            }
+            _areEventsRegistered = true;
+        }
+
         public async Task Run(CancellationToken token)
         {
             await Task.Run(async () =>
             {
                 SendMessage("Starting new trip...");
+                foreach (var logs in RemovedPointLogs)
+                {
+                    logs.Clear();
+                }
 
                 IsInTunnelMode = TripSettingsProvider.StartInTunnelMode;
                 if (TripSettingsProvider.ResumingTripId.HasValue)
@@ -134,8 +148,8 @@ namespace TripRecorder2.Services
                         ListenForSignificantChanges = false,
                         PauseLocationUpdatesAutomatically = false
                     });
-                locator.PositionChanged += Locator_PositionChanged;
-                locator.PositionError += Locator_PositionError;
+
+                RegisterEvents(locator);
 
                 try
                 {
@@ -207,13 +221,13 @@ namespace TripRecorder2.Services
                 var outSpeed = outDist / Time(prev[0], current);
                 var inDist = Dist(current, next[0]);
                 var inSpeed = inDist / Time(current, next[0]);
-                if (outSpeed > 3 * avgSpeed || inSpeed > 3 * avgSpeed)
+                if (outSpeed > 2 * avgSpeed || inSpeed > 2 * avgSpeed)
                 {
                     RemovedPointLogs[4].Add(current);
                     return true;
                 }
 
-                var distFactor = 1.5 + avgRadius / current.RangeRadius;
+                var distFactor = 1 + avgRadius / current.RangeRadius;
                 if (outDist > distFactor * avgDist || inDist > distFactor * avgDist)
                 {
                     RemovedPointLogs[5].Add(current);
@@ -253,8 +267,6 @@ namespace TripRecorder2.Services
                         return;
 
                     var minRadius = QualityBuffer.Select(p => p.RangeRadius).Min();
-                    log.AppendLine();
-                    log.Append($"Min:{minRadius:0.0}");
 
                     bool ShouldFilterPoint(int bufferIndex)
                     {
@@ -273,10 +285,8 @@ namespace TripRecorder2.Services
                                     radiiSum += QualityBuffer[i].RangeRadius;
                             }
                             var avgRadius = radiiSum / (QualityBuffer.Count - 1);
-                            log.Append($", Avg:{avgRadius:0.0}");
                             if (filterPoint.RangeRadius > avgRadius * 1.5)
                             {
-                                log.Append($", Rem:{bufferIndex}");
                                 RemovedPointLogs[3].Add(filterPoint);
                                 return true;
                             }
@@ -423,6 +433,8 @@ namespace TripRecorder2.Services
                     {
                         foreach (var p in QualityBuffer)
                         {
+                            log.AppendLine();
+                            log.Append($"POST: {p.RangeRadius:0.0}");
                             ManuallyPostPoint(p, false);
                         }
                         QualityBuffer.Clear();
