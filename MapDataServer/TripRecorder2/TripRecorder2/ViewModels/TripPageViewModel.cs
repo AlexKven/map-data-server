@@ -389,7 +389,7 @@ namespace TripRecorder2.ViewModels
 
             MessagingCenter.Subscribe<CancelledMessage>(this, "CancelledMessage", message => {
                 Device.BeginInvokeOnMainThread(() => {
-                    DisplayMessage = "Recording stopped";
+                    DisplayMessage += $"\nRecording stopped";
                     IsStartStopButtonEnabled = true;
                     IsInProgress = false;
                 });

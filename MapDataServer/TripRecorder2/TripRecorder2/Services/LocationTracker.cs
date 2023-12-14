@@ -139,7 +139,7 @@ namespace TripRecorder2.Services
                 var locator = CrossGeolocator.Current;
                 locator.DesiredAccuracy = 10;
 
-                await locator.StartListeningAsync(TimeSpan.FromSeconds(15), 15, true,
+                await locator.StartListeningAsync(TimeSpan.FromSeconds(30), 30, true,
                     new ListenerSettings()
                     {
                         ActivityType = TripSettingsProvider.HovStatus == HovStatus.Pedestrian ? ActivityType.Fitness : ActivityType.AutomotiveNavigation,
@@ -174,6 +174,7 @@ namespace TripRecorder2.Services
             point.TripId = CurrentTrip?.Id ?? 0;
 
             PendingPoints.Enqueue(point);
+
             PointsListService.TripPagePoints.Enqueue(point);
             if (showMessage)
                 SendMessage($"POST: {point.Latitude}, {point.Longitude} ({point.RangeRadius}, {DateTime.Now.ToString("HH:mm:ss")})");
@@ -181,6 +182,7 @@ namespace TripRecorder2.Services
 
         private List<TripPoint>[] RemovedPointLogs = new List<TripPoint>[]
         {
+            new List<TripPoint>(),
             new List<TripPoint>(),
             new List<TripPoint>(),
             new List<TripPoint>(),
@@ -221,16 +223,16 @@ namespace TripRecorder2.Services
                 var outSpeed = outDist / Time(prev[0], current);
                 var inDist = Dist(current, next[0]);
                 var inSpeed = inDist / Time(current, next[0]);
-                if (outSpeed > 2 * avgSpeed || inSpeed > 2 * avgSpeed)
+                if (outSpeed > 1.5 * avgSpeed || inSpeed > 1.5 * avgSpeed)
                 {
-                    RemovedPointLogs[4].Add(current);
+                    RemovedPointLogs[5].Add(current);
                     return true;
                 }
 
                 var distFactor = 1 + avgRadius / current.RangeRadius;
                 if (outDist > distFactor * avgDist || inDist > distFactor * avgDist)
                 {
-                    RemovedPointLogs[5].Add(current);
+                    RemovedPointLogs[6].Add(current);
                     return true;
                 }
             }
@@ -273,7 +275,7 @@ namespace TripRecorder2.Services
                         var filterPoint = QualityBuffer[bufferIndex];
                         if (filterPoint.RangeRadius > minRadius * 4)
                         {
-                            RemovedPointLogs[2].Add(filterPoint);
+                            RemovedPointLogs[3].Add(filterPoint);
                             return true;
                         }
                         if (QualityBuffer.Count > 1)
@@ -287,13 +289,13 @@ namespace TripRecorder2.Services
                             var avgRadius = radiiSum / (QualityBuffer.Count - 1);
                             if (filterPoint.RangeRadius > avgRadius * 1.5)
                             {
-                                RemovedPointLogs[3].Add(filterPoint);
+                                RemovedPointLogs[4].Add(filterPoint);
                                 return true;
                             }
 
                             var prev = new List<TripPoint>();
                             var next = new List<TripPoint>();
-                            for (int i = 0; i <= bufferIndex; i++)
+                            for (int i = 1; i <= bufferIndex; i++)
                             {
                                 var p = bufferIndex - i;
                                 var n = bufferIndex + i;
@@ -386,11 +388,55 @@ namespace TripRecorder2.Services
                             }
                             if (largestOverlappingInd >= 0)
                             {
-                                RemovedPointLogs[1].Add(QualityBuffer[largestOverlappingInd]);
+                                RemovedPointLogs[2].Add(QualityBuffer[largestOverlappingInd]);
                                 QualityBuffer.RemoveAt(largestOverlappingInd);
                             }
 
                         } while (largestOverlappingInd >= 0);
+                    }
+                    if (QualityBuffer.Count >= QualityBufferSize)
+                    {
+                        var dupes = new List<(int hour, int minute, int second, List<(int, double)> indexRanges)>();
+                        for (var i = 0; i < QualityBuffer.Count; i++)
+                        {
+                            var curP = QualityBuffer[i];
+                            var curT = curP.Time;
+                            var found = -1;
+                            for (var j = 0; j < dupes.Count; j++)
+                            {
+                                if (found >= 0)
+                                    continue;
+                                var curD = dupes[j];
+                                if (curD.hour == curT.Hour &&
+                                    curD.minute == curT.Minute &&
+                                    curD.second == curT.Second)
+                                    found = j;
+                            }
+                            if (found >= 0)
+                                dupes[found].indexRanges.Add((i, curP.RangeRadius));
+                            else
+                                dupes.Add((hour: curT.Hour, minute: curT.Minute, second: curT.Second, indexRanges: new List<(int, double)>() { (i, curP.RangeRadius) }));
+                        }
+                        foreach (var dupe in dupes)
+                        {
+                            if (dupe.indexRanges.Count >= 2)
+                            {
+                                var toFilter = dupe.indexRanges.OrderBy(ir => ir.Item2).Skip(1);
+                                foreach (var tf in toFilter)
+                                {
+                                    indicesToFilter.Add(tf.Item1);
+                                }
+                            }
+                        }
+                        indicesToFilter.Sort();
+
+                        for (var i = indicesToFilter.Count - 1; i >= 0; i--)
+                        {
+                            var index = indicesToFilter[i];
+                            RemovedPointLogs[1].Add(QualityBuffer[index]);
+                            QualityBuffer.RemoveAt(index);
+                        }
+                        indicesToFilter.Clear();
                     }
                     if (QualityBuffer.Count >= QualityBufferSize)
                     {

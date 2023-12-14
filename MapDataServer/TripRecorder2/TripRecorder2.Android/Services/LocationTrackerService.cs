@@ -17,13 +17,29 @@ namespace TripRecorder2.Droid.Services
     {
         CancellationTokenSource TokenSource = null;
 
+        static object lockObj = new object();
+        static DateTime lastPointTime;
+
         public override void OnCreate()
         {
             StartForeground(Constants.SERVICE_RUNNING_NOTIFICATION_ID, GetNotification());
             MessagingCenter.Subscribe<PostPointMessage>(this, nameof(PostPointMessage), message =>
             {
                 var tracker = AppStartup.Container.Resolve<LocationTracker>();
-                tracker.ManuallyPostPoint(message.Point);
+                var point = message.Point;
+                point.Time = DateTime.Now;
+
+                // gaurd to prevent multiple points from having the same time and causing problems in processing
+                lock (lockObj)
+                {
+                    var diff = point.Time - lastPointTime;
+                    if (diff < TimeSpan.FromSeconds(2))
+                    {
+                        point.Time += TimeSpan.FromSeconds(2) - diff;
+                    }
+                    lastPointTime = point.Time;
+                }
+                tracker.ManuallyPostPoint(point);
             });
             MessagingCenter.Subscribe<SetTunnelModeMessage>(this, nameof(SetTunnelModeMessage), message =>
             {
